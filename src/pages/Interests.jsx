@@ -3,6 +3,21 @@ import { useAppContext } from '../context/AppContext';
 import ProfileCard from '../components/ProfileCard';
 import Button from '../components/Button';
 
+const TabButton = ({ name, label, count, activeTab, setActiveTab }) => (
+  <button
+    className={`pb-2 px-4 font-bold text-sm cursor-pointer transition-colors pt-2`}
+    style={{
+      borderBottom: activeTab === name ? '2px solid var(--primary)' : '2px solid transparent',
+      color: activeTab === name ? 'var(--primary)' : 'var(--text-light)',
+      background: 'transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+      whiteSpace: 'nowrap'
+    }}
+    onClick={() => setActiveTab(name)}
+  >
+    {label} {count > 0 && <span className="text-white rounded-full px-2 py-0.5 text-xs ml-1" style={{ backgroundColor: 'var(--primary)' }}>{count}</span>}
+  </button>
+);
+
 const Interests = () => {
   const { currentUser, profiles, interests, acceptInterest, declineInterest, shortlists } = useAppContext();
   const [activeTab, setActiveTab] = useState('received');
@@ -61,30 +76,17 @@ const Interests = () => {
     );
   };
 
-  const TabButton = ({ name, label, count }) => (
-    <button
-      className={`pb-2 px-4 font-bold text-sm cursor-pointer transition-colors pt-2`}
-      style={{
-        borderBottom: activeTab === name ? '2px solid var(--primary)' : '2px solid transparent',
-        color: activeTab === name ? 'var(--primary)' : 'var(--text-light)',
-        background: 'transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-        whiteSpace: 'nowrap'
-      }}
-      onClick={() => setActiveTab(name)}
-    >
-      {label} {count > 0 && <span className="text-white rounded-full px-2 py-0.5 text-xs ml-1" style={{ backgroundColor: 'var(--primary)' }}>{count}</span>}
-    </button>
-  );
+
 
   return (
     <div className="container page-transition" style={{ padding: '2rem 1rem' }}>
       <h2 className="text-2xl font-bold mb-4">My Interests</h2>
       
       <div className="flex border-b overflow-x-auto gap-2">
-        <TabButton name="received" label="Received" count={receivedInterests.length} />
-        <TabButton name="accepted" label="Accepted" count={acceptedInterests.length} />
-        <TabButton name="sent" label="Sent" count={sentInterests.length} />
-        <TabButton name="shortlisted" label="Shortlisted" count={myShortlists.length} />
+        <TabButton name="received" label="Received" count={receivedInterests.length} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TabButton name="accepted" label="Accepted" count={acceptedInterests.length} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TabButton name="sent" label="Sent" count={sentInterests.length} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TabButton name="shortlisted" label="Shortlisted" count={myShortlists.length} activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
       {renderContent()}
