@@ -40,9 +40,9 @@ const CompleteProfile = () => {
   const uploadPhotoToCloudinary = async (imageFile) => {
     const uploadData = new FormData();
     uploadData.append('file', imageFile);
-    uploadData.append('upload_preset', 'ristasetu_upload'); // Ensure this match your unified preset
+    uploadData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET); // Ensure this match your unified preset
 
-    const response = await fetch('https://api.cloudinary.com/v1_1/dhzlmcsbu/image/upload', {
+    const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, {
       method: 'POST',
       body: uploadData,
     });
