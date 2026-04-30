@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from './firebase/firebaseConfig';
 
 const Register = () => {
   const [name, setName] = useState('');

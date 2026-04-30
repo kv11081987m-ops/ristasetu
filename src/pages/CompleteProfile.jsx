@@ -16,7 +16,8 @@ const CompleteProfile = () => {
     religion: 'Hindu',
     caste: '',
     city: '',
-    occupation: ''
+    occupation: '',
+    about: ''
   });
   
   const [file, setFile] = useState(null);
@@ -48,7 +49,9 @@ const CompleteProfile = () => {
     });
 
     if (!response.ok) {
-      throw new Error('Image upload failed');
+      const errorData = await response.json();
+      console.error("Cloudinary Error Response:", errorData);
+      throw new Error(`Image upload failed: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
@@ -58,6 +61,20 @@ const CompleteProfile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!currentUser) return;
+    
+    // Strict Validation
+    if (!formData.name.trim()) {
+      setError('Display Name is required.');
+      return;
+    }
+    if (!formData.gender) {
+      setError('Please select your gender.');
+      return;
+    }
+    if (!formData.about.trim() || formData.about.trim().length < 20) {
+      setError('The "About" section must be at least 20 characters long to help others know you better.');
+      return;
+    }
     if (!file) {
       setError('Please select a profile photo.');
       return;
@@ -92,7 +109,8 @@ const CompleteProfile = () => {
       // 4. Redirect
       navigate('/dashboard');
     } catch (err) {
-      console.error(err);
+      console.error("Firebase Error Details:", err.code, err.message);
+      console.error("Full Error Object:", err);
       setError('Failed to complete profile. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -160,6 +178,24 @@ const CompleteProfile = () => {
               <label className="form-label">Occupation</label>
               <input type="text" name="occupation" value={formData.occupation} onChange={handleInputChange} required className="form-input" placeholder="e.g. Software Engineer" />
             </div>
+
+            <div className="form-group mb-0 md:col-span-2">
+              <label className="form-label">About Me (Min. 20 characters)</label>
+              <textarea 
+                name="about" 
+                value={formData.about} 
+                onChange={handleInputChange} 
+                required 
+                className="form-input min-h-[120px] resize-none" 
+                placeholder="Share a bit about your personality, hobbies, and what you're looking for in a partner..."
+              ></textarea>
+              <p className="text-[10px] text-light mt-1 flex justify-between">
+                <span>Min. 20 characters</span>
+                <span className={formData.about.length >= 20 ? 'text-green-600' : 'text-red-500'}>
+                  {formData.about.length} characters
+                </span>
+              </p>
+            </div>
           </div>
 
           <div className="border-t pt-6">
@@ -188,11 +224,11 @@ const CompleteProfile = () => {
 
           <Button 
             type="submit" 
-            disabled={isSubmitting} 
+            loading={isSubmitting} 
             className="w-full mt-4 py-3 text-lg font-bold shadow-md"
             variant="primary"
           >
-            {isSubmitting ? 'Saving Profile...' : 'Complete & Go to Dashboard'}
+            Complete & Go to Dashboard
           </Button>
         </form>
       </div>

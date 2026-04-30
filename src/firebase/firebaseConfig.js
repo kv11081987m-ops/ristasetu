@@ -18,6 +18,13 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
+// Log Firebase Config (Safe)
+console.log("Firebase Project ID:", firebaseConfig.projectId);
+console.log("Firebase Config (Sanitized):", { 
+  ...firebaseConfig, 
+  apiKey: "HIDDEN" 
+});
+
 // Initialize Firebase
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);

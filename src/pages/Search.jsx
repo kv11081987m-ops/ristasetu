@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useAuthContext } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import ProfileCard from '../components/ProfileCard';
-import { Filter } from 'lucide-react';
+import Button from '../components/Button';
+import { Filter, Search as SearchIcon, Home } from 'lucide-react';
 
 const Search = () => {
-  const { profiles, currentUser } = useAppContext();
+  const { profiles } = useAppContext();
+  const { currentUser } = useAuthContext();
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     minAge: 18, maxAge: 50,
     religion: 'All', maritalStatus: 'All'
@@ -13,9 +17,8 @@ const Search = () => {
   const handleFilterChange = (e) => setFilters({...filters, [e.target.name]: e.target.value});
 
   const filteredProfiles = profiles.filter(p => {
-    // Only opposite gender for demo
-    if (p.id === currentUser.id) return false;
-    if (p.gender === currentUser.gender) return false;
+    if (!currentUser) return false;
+    if (p.id === currentUser.uid) return false;
     
     if (p.age < filters.minAge || p.age > filters.maxAge) return false;
     if (filters.religion !== 'All' && p.religion !== filters.religion) return false;
@@ -70,11 +73,34 @@ const Search = () => {
         {/* Results */}
         <div className="w-full md:w-3/4">
           <h2 className="text-xl font-bold mb-4">Search Results ({filteredProfiles.length})</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProfiles.map(profile => (
-              <ProfileCard key={profile.id} profile={profile} />
-            ))}
-          </div>
+          {filteredProfiles.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center shadow-sm">
+              <SearchIcon className="mx-auto h-12 w-12 text-gray-200 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
+              <p className="text-gray-500 mb-8">Try adjusting your filters or search criteria.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setFilters({ minAge: 18, maxAge: 50, religion: 'All', maritalStatus: 'All' })}
+                >
+                  Clear Filters
+                </Button>
+                <Button 
+                  variant="primary" 
+                  onClick={() => navigate('/dashboard')}
+                  className="flex items-center gap-2"
+                >
+                  <Home size={18} /> Back to Home
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredProfiles.map(profile => (
+                <ProfileCard key={profile.id} profile={profile} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

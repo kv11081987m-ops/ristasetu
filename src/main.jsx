@@ -5,13 +5,16 @@ import './index.css'
 import { AppProvider } from './context/AppContext.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { NotificationProvider } from './context/NotificationContext.jsx'
+import { ToastProvider } from './context/ToastContext.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
       <AppProvider>
         <NotificationProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </NotificationProvider>
       </AppProvider>
     </AuthProvider>

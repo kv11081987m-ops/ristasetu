@@ -10,6 +10,7 @@ import { calculateMatchPercentage } from '../utils/matchUtils';
 import CompletenessMeter from '../components/CompletenessMeter';
 import { calculateCompleteness } from '../utils/calculateCompleteness';
 import VerifiedBadge from '../components/VerifiedBadge';
+import Button from '../components/Button';
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
@@ -26,12 +27,11 @@ const SkeletonCard = () => (
 );
 
 const Dashboard = () => {
-  const { interests } = useAppContext();
+  const { interests, profiles, loading } = useAppContext();
   const { currentUser, userProfile, isProfileComplete } = useAuthContext();
   const completenessScore = calculateCompleteness(userProfile);
 
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -41,27 +41,6 @@ const Dashboard = () => {
     minAge: '', maxAge: '', city: '', religion: '', profession: ''
   });
 
-  useEffect(() => {
-    if (!currentUser) return;
-
-    setLoading(true);
-    const unsubscribe = onSnapshot(collection(db, 'users'), 
-      (querySnapshot) => {
-        const usersList = [];
-        querySnapshot.forEach((doc) => {
-          usersList.push({ id: doc.id, ...doc.data() });
-        });
-        setProfiles(usersList);
-        setLoading(false);
-      }, 
-      (error) => {
-        console.error("Error fetching profiles:", error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [currentUser]);
 
   if (!currentUser) return null;
 
@@ -71,11 +50,8 @@ const Dashboard = () => {
       if (p.id === currentUser.uid) return false;
       if (p.role === 'admin') return false;
 
-      const existingInterest = interests.find(
-        i => (i.senderId === currentUser.uid && i.receiverId === p.id) ||
-          (i.receiverId === currentUser.uid && i.senderId === p.id)
-      );
-      if (existingInterest) return false;
+      // Removed the filter that hides profiles with existing interests.
+      // Now the ProfileCard will handle showing the appropriate 'Interest Sent' or 'Connected' status.
 
       if (activeFilters.minAge && p.age < parseInt(activeFilters.minAge)) return false;
       if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
@@ -92,8 +68,13 @@ const Dashboard = () => {
     .sort((a, b) => b.matchScore - a.matchScore);
 
   const handleApplyFilters = () => {
-    setActiveFilters(filters);
-    setIsFilterModalOpen(false);
+    setIsApplyingFilters(true);
+    // Simulate a brief delay for a more "professional" feel as requested
+    setTimeout(() => {
+      setActiveFilters(filters);
+      setIsFilterModalOpen(false);
+      setIsApplyingFilters(false);
+    }, 600);
   };
 
   const handleClearFilters = () => {
@@ -279,12 +260,13 @@ const Dashboard = () => {
               >
                 Clear
               </button>
-              <button
+              <Button
                 onClick={handleApplyFilters}
+                loading={isApplyingFilters}
                 className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-md hover:bg-red-700 transition-colors shadow-sm"
               >
                 Apply Filters
-              </button>
+              </Button>
             </div>
           </div>
         </div>

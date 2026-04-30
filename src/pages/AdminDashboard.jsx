@@ -6,6 +6,8 @@ import {
   Menu, X, LayoutDashboard, Settings, LogOut, Bell
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import Button from '../components/Button';
+import { formatDate } from '../utils/formatDate';
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
@@ -215,6 +217,7 @@ const AdminDashboard = () => {
                     <th className="p-5 font-bold text-[10px] uppercase tracking-widest text-gray-400">Basic Info</th>
                     <th className="p-5 font-bold text-[10px] uppercase tracking-widest text-gray-400">Contact Details</th>
                     <th className="p-5 font-bold text-[10px] uppercase tracking-widest text-gray-400">Verification</th>
+                    <th className="p-5 font-bold text-[10px] uppercase tracking-widest text-gray-400">Joined Date</th>
                     <th className="p-5 font-bold text-[10px] uppercase tracking-widest text-gray-400">Operations</th>
                   </tr>
                 </thead>
@@ -249,22 +252,20 @@ const AdminDashboard = () => {
                           </span>
                         )}
                       </td>
+                      <td className="p-5 text-sm text-gray-500 font-medium">
+                        {formatDate(user.createdAt)}
+                      </td>
                       <td className="p-5 text-right sm:text-left">
-                        <button
+                        <Button
                           onClick={() => toggleVerification(user.id, user.isVerified)}
-                          disabled={updatingId === user.id}
-                          className={`min-w-[140px] px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 ${
-                            user.isVerified 
-                              ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200' 
-                              : 'bg-purple-600 text-white hover:bg-purple-700 shadow-purple-100'
+                          loading={updatingId === user.id}
+                          variant={user.isVerified ? 'outline' : 'primary'}
+                          className={`min-w-[140px] px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm ${
+                            !user.isVerified ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-100' : ''
                           }`}
                         >
-                          {updatingId === user.id ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            user.isVerified ? 'Revoke Access' : 'Authorize User'
-                          )}
-                        </button>
+                          {user.isVerified ? 'Revoke Access' : 'Authorize User'}
+                        </Button>
                       </td>
                     </tr>
                   ))}

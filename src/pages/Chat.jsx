@@ -1,30 +1,39 @@
-import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Send } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { Send, MessageSquare, Home } from 'lucide-react';
+import { formatTime } from '../utils/formatDate';
+import Button from '../components/Button';
 
 const Chat = () => {
-  const { currentUser, chats, profiles, sendMessage } = useAppContext();
+  const { chats, profiles, sendMessage } = useAppContext();
+  const { currentUser } = useAuthContext();
+  const navigate = useNavigate();
   const [activeChatId, setActiveChatId] = useState(null);
   const [text, setText] = useState('');
 
-  const myChats = chats.filter(c => c.participants.includes(currentUser.id));
+  const myChats = currentUser ? chats.filter(c => c.participants.includes(currentUser.uid)) : [];
   
   const activeChat = myChats.find(c => c.id === activeChatId);
-  const otherUser = activeChat ? profiles.find(p => p.id === activeChat.participants.find(id => id !== currentUser.id)) : null;
+  const otherUser = activeChat ? profiles.find(p => p.id === activeChat.participants.find(id => id !== currentUser.uid)) : null;
 
   const handleSend = (e) => {
     e.preventDefault();
     if (!text.trim() || !activeChatId) return;
-    sendMessage(activeChatId, text);
+    sendMessage(activeChatId, text, currentUser.uid);
     setText('');
   };
 
   if (myChats.length === 0) {
     return (
       <div className="container page-transition" style={{ padding: '2rem 1rem' }}>
-        <div className="bg-surface border p-8 rounded-lg text-center shadow-sm">
+        <div className="bg-white border border-gray-100 p-12 rounded-2xl text-center shadow-sm">
+          <MessageSquare className="mx-auto h-12 w-12 text-gray-200 mb-4" />
           <h2 className="text-xl font-bold mb-2">No active chats</h2>
-          <p className="text-light">You can start chatting once your interest is accepted by a match.</p>
+          <p className="text-gray-500 mb-8 max-w-xs mx-auto">You can start chatting once your interest is accepted by a match.</p>
+          <Button variant="primary" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 mx-auto">
+            <Home size={18} /> Back to Dashboard
+          </Button>
         </div>
       </div>
     );
@@ -38,7 +47,7 @@ const Chat = () => {
         <div className="p-4 border-b font-bold text-lg text-primary">Matches</div>
         <div className="flex-1 overflow-y-auto">
           {myChats.map(chat => {
-            const partnerId = chat.participants.find(id => id !== currentUser.id);
+            const partnerId = chat.participants.find(id => id !== currentUser.uid);
             const partner = profiles.find(p => p.id === partnerId);
             const lastMsg = chat.messages[chat.messages.length - 1];
             
@@ -77,13 +86,13 @@ const Chat = () => {
                 <div className="text-center text-light mt-4 text-sm">Send your first message to {otherUser?.name}!</div>
               )}
               {activeChat.messages.map(msg => {
-                const isMe = msg.senderId === currentUser.id;
+                const isMe = msg.senderId === currentUser.uid;
                 return (
                   <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <div className={`p-3 rounded-lg ${isMe ? 'bg-primary text-white' : 'bg-white border text-text-main'}`} style={{ maxWidth: '70%', borderBottomRightRadius: isMe ? 0 : '0.5rem', borderBottomLeftRadius: isMe ? '0.5rem' : 0 }}>
                       <div className="mb-1">{msg.text}</div>
                       <div className="text-xs" style={{ opacity: 0.8, color: isMe ? '#E5E7EB' : '#9CA3AF' }}>
-                        {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        {formatTime(msg.timestamp)}
                       </div>
                     </div>
                   </div>

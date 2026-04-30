@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Briefcase, BadgeCheck, Send, MessageCircle, Lock } from 'lucide-react';
 import VerifiedBadge from './VerifiedBadge';
@@ -7,15 +7,53 @@ import { useAuthContext } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 
 import { calculateMatchPercentage } from '../utils/matchUtils';
+import { CheckCircle, Clock } from 'lucide-react';
 
 const ProfileCard = ({ profile, actionButton }) => {
   const { isProfileComplete, userProfile } = useAuthContext();
-  const { sendInterest } = useAppContext();
+  const { sendInterest, interests } = useAppContext();
+
+  const existingInterest = interests.find(
+    i => (i.senderId === userProfile?.uid && i.receiverId === profile.id) || 
+         (i.receiverId === userProfile?.uid && i.senderId === profile.id)
+  );
+
+  const [interestStatus, setInterestStatus] = useState('idle'); // 'idle', 'sending', 'sent'
+  const [countdown, setCountdown] = useState(15);
+  const timerRef = useRef(null);
+  const countdownRef = useRef(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
 
   const handleSendInterest = () => {
     if (!isProfileComplete) return;
-    sendInterest(profile.id);
-    alert(`Interest sent to ${profile.name}`);
+    
+    setInterestStatus('sending');
+    setCountdown(15);
+
+    // Save to Firestore after 15 seconds
+    timerRef.current = setTimeout(() => {
+      sendInterest(profile.id, userProfile.uid);
+      setInterestStatus('sent');
+    }, 15000);
+
+    // Update visual countdown
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+  };
+
+  const handleUndo = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setInterestStatus('idle');
+    setCountdown(15);
   };
 
   const matchPercentage = calculateMatchPercentage(userProfile, profile);
@@ -82,18 +120,66 @@ const ProfileCard = ({ profile, actionButton }) => {
               </Link>
               
               <div className="flex-1 relative group">
-                <Button 
-                  onClick={handleSendInterest}
-                  disabled={!isProfileComplete}
-                  className={`w-full h-10 flex items-center justify-center gap-2 ${
-                    !isProfileComplete ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500 border-none' : 'bg-primary text-white hover:bg-primary-hover'
-                  }`}
-                  style={{ padding: '0.5rem' }}
-                >
-                  <Send size={16} /> <span className="hidden sm:inline">Connect</span>
-                </Button>
+                {(existingInterest || interestStatus === 'sent') ? (
+                  <Button 
+                    disabled={true}
+                    className="w-full h-10 flex items-center justify-center gap-2 opacity-80 cursor-default"
+                    variant={existingInterest?.status === 'accepted' ? 'secondary' : 'outline'}
+                    style={{ 
+                      padding: '0.5rem',
+                      backgroundColor: existingInterest?.status === 'accepted' ? 'var(--secondary)' : '#F3F4F6',
+                      color: existingInterest?.status === 'accepted' ? 'white' : '#6B7280',
+                      border: 'none'
+                    }}
+                  >
+                    {existingInterest?.status === 'accepted' ? (
+                      <><MessageCircle size={16} /> <span className="hidden sm:inline">Connected</span></>
+                    ) : (
+                      <><Clock size={16} /> <span className="hidden sm:inline">Interest Sent</span></>
+                    )}
+                  </Button>
+                ) : interestStatus === 'sending' ? (
+                  <div className="flex flex-col gap-2 w-full">
+                    <Button 
+                      disabled={true}
+                      className={`w-full h-10 flex items-center justify-center gap-2 bg-green-600 text-white cursor-not-allowed`}
+                      style={{ padding: '0.5rem', backgroundColor: '#16A34A', color: 'white', border: 'none' }}
+                    >
+                      <CheckCircle size={16} /> <span className="hidden sm:inline">Interest Sent</span>
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={handleUndo}
+                        className="flex-1 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg border border-gray-200 transition-all cursor-pointer bg-white"
+                      >
+                        Undo ({countdown}s)
+                      </button>
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-green-500 transition-all duration-1000 ease-linear"
+                          style={{ width: `${(countdown / 15) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Button 
+                    onClick={handleSendInterest}
+                    disabled={!isProfileComplete}
+                    className={`w-full h-10 flex items-center justify-center gap-2 ${
+                      !isProfileComplete ? 'opacity-50 cursor-not-allowed bg-gray-300 text-gray-500 border-none' : 'bg-red-600 text-white'
+                    }`}
+                    variant="primary"
+                    style={{ 
+                      padding: '0.5rem',
+                      backgroundColor: !isProfileComplete ? '#E5E7EB' : '#DC2626'
+                    }}
+                  >
+                    <Send size={16} /> <span className="hidden sm:inline">Connect</span>
+                  </Button>
+                )}
                 
-                {!isProfileComplete && (
+                {!isProfileComplete && !existingInterest && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded text-center z-10 shadow-lg">
                     Please complete your profile to interact
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>

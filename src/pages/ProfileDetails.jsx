@@ -3,17 +3,41 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
-import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock } from 'lucide-react';
+import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock, Calendar, Loader2 } from 'lucide-react';
+import { formatDate } from '../utils/formatDate';
 
 const ProfileDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { profiles, currentUser, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
+  const { profiles, loading, currentUser, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
   const { userProfile: currentUserProfile } = useAuthContext();
   
   const profile = profiles.find(p => p.id === id);
   
-  if (!profile) return <div className="p-8 text-center font-bold text-gray-500">Profile not found</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="animate-spin text-primary" size={48} />
+        <p className="text-light font-medium">Fetching profile details...</p>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    console.error(`Profile not found for ID: ${id}. Available IDs:`, profiles.map(p => p.id));
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md mx-auto">
+          <ShieldAlert size={48} className="text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Profile Not Found</h2>
+          <p className="text-light mb-6">The profile you are looking for might have been removed or the link is incorrect.</p>
+          <Button onClick={() => navigate('/dashboard')} variant="primary" className="w-full">
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const isShortlisted = shortlists.some(s => s.userId === currentUser?.id && s.profileId === profile.id);
   const existingInterest = interests.find(
@@ -33,7 +57,7 @@ const ProfileDetails = () => {
       }
       return <Button variant="outline" className="w-full" disabled>Interest {existingInterest.status.charAt(0).toUpperCase() + existingInterest.status.slice(1)}</Button>;
     }
-    return <Button variant="primary" className="w-full" onClick={() => sendInterest(profile.id)}>Send Interest</Button>;
+    return <Button variant="primary" className="w-full" onClick={() => sendInterest(profile.id, currentUserProfile.uid)}>Send Interest</Button>;
   };
 
   return (
@@ -99,6 +123,11 @@ const ProfileDetails = () => {
                 <p><strong>Profession:</strong> {profile.profession}</p>
                 <p><strong>Income:</strong> {profile.incomeRange}</p>
               </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-light mb-8 bg-gray-50 p-2 rounded-lg w-fit">
+              <Calendar size={14} className="text-secondary" />
+              <span>Member Since: {formatDate(profile.createdAt)}</span>
             </div>
 
             <div className="mb-6">
