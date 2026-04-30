@@ -1,21 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShieldCheck, UserCircle, LogOut, User, Settings, SlidersHorizontal } from 'lucide-react';
+import { ShieldCheck, UserCircle, LogOut, User, Settings, SlidersHorizontal, Home as HomeIcon, MessageCircle, Bell, Crown } from 'lucide-react';
 import { useAuthContext } from '../context/AuthContext';
+import { useNotificationContext } from '../context/NotificationContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 
 const Navbar = () => {
   const { currentUser, userProfile } = useAuthContext();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationContext();
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const notifRef = useRef(null);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
       }
     };
 
@@ -36,12 +43,7 @@ const Navbar = () => {
   };
 
   const getProfileImageUrl = () => {
-    if (userProfile?.profileImages && userProfile.profileImages.length > 0) {
-      return userProfile.profileImages[0];
-    }
-    if (userProfile?.photoURL) {
-      return userProfile.photoURL;
-    }
+    if (userProfile?.photoUrl) return userProfile.photoUrl;
     return null;
   };
 
@@ -59,7 +61,71 @@ const Navbar = () => {
         
         <div className="flex items-center gap-4">
           {currentUser ? (
-            <div className="relative" ref={dropdownRef}>
+            <>
+              <nav className="hidden md:flex items-center gap-6 mr-4 text-gray-600 font-medium transition-all">
+                <Link to="/dashboard" className="flex items-center gap-2 hover:text-primary transition-colors"><HomeIcon size={20} /> Home</Link>
+                <Link to="/chat" className="flex items-center gap-2 hover:text-primary transition-colors"><MessageCircle size={20} /> Chats</Link>
+              </nav>
+
+              {/* Notifications */}
+              <div className="relative" ref={notifRef}>
+                <button 
+                  onClick={() => setIsNotifOpen(!isNotifOpen)}
+                  className="p-2 text-gray-600 hover:text-red-600 transition-colors relative"
+                >
+                  <Bell size={24} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {isNotifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-2 border border-gray-100 z-50">
+                    <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                      <h3 className="font-bold text-sm">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <button 
+                          onClick={markAllAsRead}
+                          className="text-[10px] text-red-600 hover:underline font-bold"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-gray-500 text-sm">
+                          No notifications yet
+                        </div>
+                      ) : (
+                        notifications.map(notif => (
+                          <div 
+                            key={notif.id}
+                            className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${notif.status === 'unread' ? 'bg-red-50/30' : ''}`}
+                            onClick={() => {
+                              markAsRead(notif.id);
+                              if (notif.type === 'message') navigate('/chat');
+                              if (notif.type === 'interest') navigate('/interests');
+                              setIsNotifOpen(false);
+                            }}
+                          >
+                            <p className="text-sm text-gray-800">
+                              <span className="font-bold">{notif.fromName}</span> {notif.type === 'interest' ? 'sent you an interest' : 'sent you a message'}
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-1">
+                              {notif.createdAt?.toDate().toLocaleString()}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center focus:outline-none"
@@ -87,12 +153,21 @@ const Navbar = () => {
                   </div>
                   
                   <Link 
-                    to="/profile" 
+                    to="/dashboard" 
                     onClick={() => setIsDropdownOpen(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
                   >
                     <User size={16} />
-                    Profile
+                    My Dashboard
+                  </Link>
+
+                  <Link 
+                    to="/interests" 
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                  >
+                    <SlidersHorizontal size={16} />
+                    My Interests
                   </Link>
                   
                   <Link 
@@ -104,15 +179,26 @@ const Navbar = () => {
                     Settings
                   </Link>
                   
+                  {userProfile?.role === 'admin' && (
+                    <Link 
+                      to="/admin" 
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <ShieldCheck size={16} />
+                      Admin Dashboard
+                    </Link>
+                  )}
+
                   <Link 
-                    to="/filter" 
+                    to="/premium" 
                     onClick={() => setIsDropdownOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors"
                   >
-                    <SlidersHorizontal size={16} />
-                    Filter
+                    <Crown size={16} />
+                    Upgrade to Premium
                   </Link>
-                  
+
                   <div className="border-t border-gray-100 my-1"></div>
                   
                   <button 
@@ -125,6 +211,7 @@ const Navbar = () => {
                 </div>
               )}
             </div>
+            </>
           ) : (
             <Link 
               to="/login" 

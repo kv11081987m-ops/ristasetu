@@ -41,7 +41,11 @@ const Login = () => {
       setError('Failed to send OTP. Remember to provide valid SMS format.');
       if (window.recaptchaVerifier) {
         window.recaptchaVerifier.render().then(widgetId => {
-          window.recaptchaReset(widgetId);
+          if (typeof window.recaptchaReset === 'function') {
+            window.recaptchaReset(widgetId);
+          } else if (window.grecaptcha && typeof window.grecaptcha.reset === 'function') {
+            window.grecaptcha.reset(widgetId);
+          }
         });
       }
     } finally {
@@ -66,11 +70,19 @@ const Login = () => {
 
       if (!userDoc.exists()) {
         // Create new user profile document
+        const isAdmin = user.phoneNumber === '+918010703233' || user.phoneNumber === '8010703233';
         await setDoc(userDocRef, {
           phone: user.phoneNumber,
           createdAt: serverTimestamp(),
-          hasProfile: false
+          hasProfile: false,
+          role: isAdmin ? 'admin' : 'user'
         });
+      } else if (user.phoneNumber === '+918010703233' || user.phoneNumber === '8010703233') {
+        // Ensure existing user with this number also gets admin role
+        const data = userDoc.data();
+        if (data.role !== 'admin') {
+          await setDoc(userDocRef, { role: 'admin' }, { merge: true });
+        }
       }
 
       // Route to dashboard

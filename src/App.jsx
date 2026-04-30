@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import { useAuthContext } from './context/AuthContext';
+import AdminRoute from './components/AdminRoute';
 
 // Pages
 import Splash from './pages/Splash';
@@ -16,6 +17,7 @@ import Chat from './pages/Chat';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
 import CompleteProfile from './pages/CompleteProfile';
+import Subscription from './pages/Subscription';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser, isProfileComplete } = useAuthContext();
@@ -45,6 +47,7 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+
 const App = () => {
   return (
     <Router>
@@ -67,8 +70,9 @@ const App = () => {
             <Route path="/interests" element={<ProtectedRoute><Interests /></ProtectedRoute>} />
             <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/premium" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
 
-            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           </Routes>
         </main>
         <BottomNav />

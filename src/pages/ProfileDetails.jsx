@@ -1,23 +1,30 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
+import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
-import { BadgeCheck, Heart, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock } from 'lucide-react';
 
 const ProfileDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { profiles, currentUser, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
+  const { userProfile: currentUserProfile } = useAuthContext();
   
   const profile = profiles.find(p => p.id === id);
   
-  if (!profile) return <div className="p-8 text-center">Profile not found</div>;
+  if (!profile) return <div className="p-8 text-center font-bold text-gray-500">Profile not found</div>;
 
-  const isShortlisted = shortlists.some(s => s.userId === currentUser.id && s.profileId === profile.id);
+  const isShortlisted = shortlists.some(s => s.userId === currentUser?.id && s.profileId === profile.id);
   const existingInterest = interests.find(
-    i => (i.senderId === currentUser.id && i.receiverId === profile.id) || 
-         (i.receiverId === currentUser.id && i.senderId === profile.id)
+    i => (i.senderId === currentUser?.id && i.receiverId === profile.id) || 
+         (i.receiverId === currentUser?.id && i.senderId === profile.id)
   );
+
+  const isOwner = currentUserProfile?.uid === profile.id || currentUserProfile?.uid === profile.uid;
+  const isAdmin = currentUserProfile?.role === 'admin';
+  const isMatch = existingInterest?.status === 'accepted';
+  const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin && !isMatch;
 
   const renderContactAction = () => {
     if (existingInterest) {
@@ -30,18 +37,32 @@ const ProfileDetails = () => {
   };
 
   return (
-    <div className="container page-transition" style={{ padding: '2rem 1rem' }}>
-      <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-primary mb-4 bg-transparent border-none cursor-pointer font-bold">
-        <ArrowLeft size={20} /> Back
+    <div className="container mx-auto px-4 py-8 page-transition">
+      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-primary hover:text-primary-hover mb-6 bg-transparent border-none cursor-pointer font-bold transition-colors">
+        <ArrowLeft size={20} /> Back to Results
       </button>
 
-      <div className="bg-surface rounded-lg shadow-md border overflow-hidden">
-        <div className="flex flex-col md:flex-row">
-          <div className="md:w-1/3" style={{ position: 'relative' }}>
-            <img src={profile.photoUrl} alt={profile.name} style={{ width: '100%', height: '100%', minHeight: '300px', objectFit: 'cover' }} />
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-5xl mx-auto">
+        <div className="flex flex-col lg:flex-row">
+          <div className="lg:w-2/5 relative">
+            <img 
+              src={isPhotoHidden ? 'https://placehold.co/600x800/png?text=Photo+Protected' : (profile.photoUrl || 'https://placehold.co/600x800/png?text=No+Photo')} 
+              alt={profile.name} 
+              className={`w-full h-full min-h-[400px] object-cover transition-all duration-700 ${isPhotoHidden ? 'blur-xl scale-110' : ''}`} 
+              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/600x800/png?text=No+Photo'; }}
+            />
+            {isPhotoHidden && (
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-center p-8">
+                <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl mb-4 border border-white/30">
+                  <Lock size={32} className="text-white" />
+                </div>
+                <h3 className="text-white text-xl font-bold mb-2">Photo Protected</h3>
+                <p className="text-white/80 text-sm">This user has restricted photo visibility. Send an interest to request access.</p>
+              </div>
+            )}
             {profile.isVerified && (
-              <div style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(255,255,255,0.9)', padding: '6px 12px', borderRadius: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <BadgeCheck size={20} color="var(--secondary)" />
+              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg border border-white">
+                <BadgeCheck size={20} className="text-secondary" />
                 <span className="text-sm font-bold text-secondary">Verified Profile</span>
               </div>
             )}

@@ -1,13 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ProfileCard from '../components/ProfileCard';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { Filter, UserPlus, Edit3, X } from 'lucide-react';
+import { db } from '../firebase/firebaseConfig';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { calculateMatchPercentage } from '../utils/matchUtils';
+import CompletenessMeter from '../components/CompletenessMeter';
+import { calculateCompleteness } from '../utils/calculateCompleteness';
+import VerifiedBadge from '../components/VerifiedBadge';
+
+const SkeletonCard = () => (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
+    <div className="h-48 bg-gray-200 w-full" />
+    <div className="p-4">
+      <div className="h-6 bg-gray-200 rounded w-3/4 mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
+      <div className="flex gap-2">
+        <div className="h-8 bg-gray-200 rounded flex-1" />
+        <div className="h-8 bg-gray-200 rounded flex-1" />
+      </div>
+    </div>
+  </div>
+);
 
 const Dashboard = () => {
-  const { profiles, interests } = useAppContext();
-  const { currentUser, isProfileComplete } = useAuthContext();
+  const { interests } = useAppContext();
+  const { currentUser, userProfile, isProfileComplete } = useAuthContext();
+  const completenessScore = calculateCompleteness(userProfile);
+
+  const [profiles, setProfiles] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -17,26 +41,55 @@ const Dashboard = () => {
     minAge: '', maxAge: '', city: '', religion: '', profession: ''
   });
 
+  useEffect(() => {
+    if (!currentUser) return;
+
+    setLoading(true);
+    const unsubscribe = onSnapshot(collection(db, 'users'), 
+      (querySnapshot) => {
+        const usersList = [];
+        querySnapshot.forEach((doc) => {
+          usersList.push({ id: doc.id, ...doc.data() });
+        });
+        setProfiles(usersList);
+        setLoading(false);
+      }, 
+      (error) => {
+        console.error("Error fetching profiles:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   if (!currentUser) return null;
 
   // Recommendations and filtering logic
-  const recommendedProfiles = profiles.filter(p => {
-    if (p.id === currentUser.uid) return false;
+  const recommendedProfiles = profiles
+    .filter(p => {
+      if (p.id === currentUser.uid) return false;
+      if (p.role === 'admin') return false;
 
-    const existingInterest = interests.find(
-      i => (i.senderId === currentUser.uid && i.receiverId === p.id) ||
-        (i.receiverId === currentUser.uid && i.senderId === p.id)
-    );
-    if (existingInterest) return false;
+      const existingInterest = interests.find(
+        i => (i.senderId === currentUser.uid && i.receiverId === p.id) ||
+          (i.receiverId === currentUser.uid && i.senderId === p.id)
+      );
+      if (existingInterest) return false;
 
-    if (activeFilters.minAge && p.age < parseInt(activeFilters.minAge)) return false;
-    if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
-    if (activeFilters.city && p.city && !p.city.toLowerCase().includes(activeFilters.city.toLowerCase())) return false;
-    if (activeFilters.religion && p.religion && p.religion.toLowerCase() !== activeFilters.religion.toLowerCase()) return false;
-    if (activeFilters.profession && p.profession && !p.profession.toLowerCase().includes(activeFilters.profession.toLowerCase())) return false;
+      if (activeFilters.minAge && p.age < parseInt(activeFilters.minAge)) return false;
+      if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
+      if (activeFilters.city && p.city && !p.city.toLowerCase().includes(activeFilters.city.toLowerCase())) return false;
+      if (activeFilters.religion && p.religion && p.religion.toLowerCase() !== activeFilters.religion.toLowerCase()) return false;
+      if (activeFilters.profession && p.profession && !p.profession.toLowerCase().includes(activeFilters.profession.toLowerCase())) return false;
 
-    return true;
-  });
+      return true;
+    })
+    .map(p => ({
+      ...p,
+      matchScore: calculateMatchPercentage(userProfile, p)
+    }))
+    .sort((a, b) => b.matchScore - a.matchScore);
 
   const handleApplyFilters = () => {
     setActiveFilters(filters);
@@ -53,9 +106,16 @@ const Dashboard = () => {
   return (
     <div className="container mx-auto px-4 py-8 page-transition">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-sm font-medium text-red-600 uppercase tracking-wider">Welcome, {userProfile?.name || 'User'}</h3>
+            <VerifiedBadge isVerified={userProfile?.isVerified} size={14} />
+          </div>
           <h2 className="text-3xl font-bold text-gray-800">Recommended Matches</h2>
-          <p className="text-gray-500 text-sm mt-1">Profiles selected based on your preferences</p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-1">
+            <p className="text-gray-500 text-sm whitespace-nowrap">Profiles based on your preferences</p>
+            <CompletenessMeter score={completenessScore} />
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -105,7 +165,11 @@ const Dashboard = () => {
         </div>
       )}
 
-      {recommendedProfiles.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(n => <SkeletonCard key={n} />)}
+        </div>
+      ) : recommendedProfiles.length === 0 ? (
         <div className="bg-white border border-gray-100 p-12 rounded-xl text-center shadow-sm">
           <Filter className="mx-auto h-12 w-12 text-gray-300 mb-4" />
           <h3 className="text-lg font-medium text-gray-900">No matches found</h3>

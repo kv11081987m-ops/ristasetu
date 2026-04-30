@@ -49,7 +49,7 @@ const Chat = () => {
                 style={{ backgroundColor: activeChatId === chat.id ? '#F3F4F6' : 'transparent' }}
                 onClick={() => setActiveChatId(chat.id)}
               >
-                <img src={partner?.photoUrl} alt="" className="rounded-full object-cover border" style={{ width: '48px', height: '48px', minWidth: '48px' }} />
+                <img src={partner?.photoUrl || 'https://placehold.co/48x48/png?text=U'} alt="" className="rounded-full object-cover border" style={{ width: '48px', height: '48px', minWidth: '48px' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/48x48/png?text=U'; }} />
                 <div className="flex-1 overflow-hidden">
                   <div className="font-bold">{partner?.name}</div>
                   <div className="text-sm text-light truncate mb-0">{lastMsg ? lastMsg.text : 'Start chatting...'}</div>
@@ -68,7 +68,7 @@ const Chat = () => {
           <>
             <div className="p-4 border-b flex items-center gap-3">
               <button className="md:hidden border-none bg-transparent font-bold cursor-pointer text-primary" onClick={() => setActiveChatId(null)}>← Back</button>
-              <img src={otherUser?.photoUrl} alt="" className="rounded-full object-cover" style={{ width: '40px', height: '40px' }} />
+              <img src={otherUser?.photoUrl || 'https://placehold.co/40x40/png?text=U'} alt="" className="rounded-full object-cover" style={{ width: '40px', height: '40px' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/40x40/png?text=U'; }} />
               <div className="font-bold">{otherUser?.name}</div>
             </div>
             

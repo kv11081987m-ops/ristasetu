@@ -77,6 +77,9 @@ const CompleteProfile = () => {
         isProfileComplete: true,
         uid: currentUser.uid,
         email: currentUser.email,
+        kycStatus: 'not_started',
+        isPremium: false,
+        premiumPlan: 'none',
         createdAt: new Date().toISOString()
       };
 

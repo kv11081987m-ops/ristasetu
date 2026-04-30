@@ -7,7 +7,7 @@ const Button = ({ children, variant = 'primary', className = '', style = {}, ...
     fontWeight: '600',
     border: 'none',
     cursor: 'pointer',
-    transition: 'opacity 0.2s, background-color 0.2s',
+    transition: 'all 0.3s ease',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -41,10 +41,14 @@ const Button = ({ children, variant = 'primary', className = '', style = {}, ...
   return (
     <button style={combinedStyles} className={className} 
       onMouseOver={(e) => {
-        if(variant !== 'outline') e.currentTarget.style.opacity = 0.9;
+        e.currentTarget.style.transform = 'scale(1.02)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+        if(variant !== 'outline') e.currentTarget.style.backgroundColor = 'var(--primary-hover)';
       }}
       onMouseOut={(e) => {
-        if(variant !== 'outline') e.currentTarget.style.opacity = 1;
+        e.currentTarget.style.transform = 'scale(1)';
+        e.currentTarget.style.boxShadow = 'none';
+        if(variant !== 'outline') e.currentTarget.style.backgroundColor = combinedStyles.backgroundColor;
       }}
       {...props}>
       {children}

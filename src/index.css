@@ -3,9 +3,9 @@
 
 
 :root {
-  --primary: #9B2C2C;
-  /* Maroon */
-  --primary-hover: #7B2222;
+  --primary: #800000;
+  /* Deep Maroon */
+  --primary-hover: #5c0000;
   --secondary: #0D9488;
   /* Teal */
   --secondary-hover: #0F766E;
