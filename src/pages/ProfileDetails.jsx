@@ -9,11 +9,11 @@ import { formatDate } from '../utils/formatDate';
 const ProfileDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { profiles, loading, currentUser, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
-  const { userProfile: currentUserProfile } = useAuthContext();
-  
+  const { profiles, loading, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
+  const { currentUser, userProfile: currentUserProfile } = useAuthContext();
+
   const profile = profiles.find(p => p.id === id);
-  
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
@@ -24,7 +24,6 @@ const ProfileDetails = () => {
   }
 
   if (!profile) {
-    console.error(`Profile not found for ID: ${id}. Available IDs:`, profiles.map(p => p.id));
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-md mx-auto">
@@ -39,13 +38,13 @@ const ProfileDetails = () => {
     );
   }
 
-  const isShortlisted = shortlists.some(s => s.userId === currentUser?.id && s.profileId === profile.id);
+  // interests/shortlists are already scoped to current user by AppContext queries
+  const isShortlisted = shortlists.some(s => s.profileId === profile.id);
   const existingInterest = interests.find(
-    i => (i.senderId === currentUser?.id && i.receiverId === profile.id) || 
-         (i.receiverId === currentUser?.id && i.senderId === profile.id)
+    i => i.receiverId === profile.id || i.senderId === profile.id
   );
 
-  const isOwner = currentUserProfile?.uid === profile.id || currentUserProfile?.uid === profile.uid;
+  const isOwner = currentUser?.uid === profile.id || currentUser?.uid === profile.uid;
   const isAdmin = currentUserProfile?.role === 'admin';
   const isMatch = existingInterest?.status === 'accepted';
   const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin && !isMatch;
@@ -96,12 +95,12 @@ const ProfileDetails = () => {
             <div className="flex justify-between items-start mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold mb-1">{profile.name}</h1>
-                <p className="text-light text-lg">{profile.age} yrs • {profile.height} • {profile.maritalStatus}</p>
+                <p className="text-light text-lg">{profile.age} yrs{profile.height ? ` • ${profile.height}` : ''}{profile.maritalStatus ? ` • ${profile.maritalStatus}` : ''}</p>
                 <p className="text-light text-lg">{profile.city}, {profile.state}</p>
               </div>
               <div className="flex flex-col gap-2">
                 <button 
-                  onClick={() => toggleShortlist(profile.id)}
+                  onClick={() => toggleShortlist(profile.id, currentUserProfile?.uid)}
                   className="bg-transparent border-none cursor-pointer flex items-center justify-center p-2 rounded-full"
                   title="Shortlist Profile"
                   style={{ background: 'var(--bg-color)' }}
@@ -119,9 +118,9 @@ const ProfileDetails = () => {
               </div>
               <div>
                 <h3 className="font-bold text-sm text-light mb-1 border-b pb-1">EDUCATION & CAREER</h3>
-                <p><strong>Education:</strong> {profile.education}</p>
-                <p><strong>Profession:</strong> {profile.profession}</p>
-                <p><strong>Income:</strong> {profile.incomeRange}</p>
+                {profile.education && <p><strong>Education:</strong> {profile.education}</p>}
+                <p><strong>Profession:</strong> {profile.occupation || profile.profession || 'Not specified'}</p>
+                {profile.incomeRange && <p><strong>Income:</strong> {profile.incomeRange}</p>}
               </div>
             </div>
 
@@ -130,20 +129,26 @@ const ProfileDetails = () => {
               <span>Member Since: {formatDate(profile.createdAt)}</span>
             </div>
 
-            <div className="mb-6">
-              <h3 className="font-bold text-lg mb-2 text-primary">About Me</h3>
-              <p className="text-light leading-relaxed">{profile.aboutMe}</p>
-            </div>
+            {(profile.about || profile.aboutMe) && (
+              <div className="mb-6">
+                <h3 className="font-bold text-lg mb-2 text-primary">About Me</h3>
+                <p className="text-light leading-relaxed">{profile.about || profile.aboutMe}</p>
+              </div>
+            )}
 
-            <div className="mb-8">
-              <h3 className="font-bold text-lg mb-2 text-primary">Family Details</h3>
-              <p className="text-light leading-relaxed">{profile.familyDetails}</p>
-            </div>
+            {profile.familyDetails && (
+              <div className="mb-8">
+                <h3 className="font-bold text-lg mb-2 text-primary">Family Details</h3>
+                <p className="text-light leading-relaxed">{profile.familyDetails}</p>
+              </div>
+            )}
 
-            <div className="mb-8">
-              <h3 className="font-bold text-lg mb-2 text-primary">Partner Preferences</h3>
-              <p className="text-light leading-relaxed">{profile.partnerPreferences}</p>
-            </div>
+            {profile.partnerPreferences && (
+              <div className="mb-8">
+                <h3 className="font-bold text-lg mb-2 text-primary">Partner Preferences</h3>
+                <p className="text-light leading-relaxed">{profile.partnerPreferences}</p>
+              </div>
+            )}
 
             {existingInterest?.status === 'accepted' && (
               <div className="bg-green-50 p-4 rounded-lg mb-6 border" style={{ borderColor: 'var(--secondary)', backgroundColor: '#F0FDF4' }}>
@@ -157,7 +162,10 @@ const ProfileDetails = () => {
               <div className="w-full md:w-1/2">
                 {renderContactAction()}
               </div>
-              <button className="flex items-center gap-2 text-sm text-light bg-transparent border-none cursor-pointer" onClick={() => alert('Report submitted.')}>
+              <button
+                className="flex items-center gap-2 text-sm text-light bg-transparent border-none cursor-pointer"
+                onClick={() => window.open(`mailto:support@ristasetu.com?subject=Report Profile ${profile.id}&body=I want to report the profile of ${profile.name} (ID: ${profile.id}). Reason: `, '_blank')}
+              >
                 <ShieldAlert size={16} /> Report Profile
               </button>
             </div>

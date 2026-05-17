@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ProfileCard from '../components/ProfileCard';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { Filter, UserPlus, Edit3, X } from 'lucide-react';
-import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { calculateMatchPercentage } from '../utils/matchUtils';
 import CompletenessMeter from '../components/CompletenessMeter';
 import { calculateCompleteness } from '../utils/calculateCompleteness';
@@ -27,18 +25,16 @@ const SkeletonCard = () => (
 );
 
 const Dashboard = () => {
-  const { interests, profiles, loading } = useAppContext();
+  const { profiles, loading } = useAppContext();
   const { currentUser, userProfile, isProfileComplete } = useAuthContext();
   const completenessScore = calculateCompleteness(userProfile);
 
-  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
-
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
-    minAge: '', maxAge: '', city: '', religion: '', profession: ''
+    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: ''
   });
   const [activeFilters, setActiveFilters] = useState({
-    minAge: '', maxAge: '', city: '', religion: '', profession: ''
+    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: ''
   });
 
 
@@ -57,7 +53,9 @@ const Dashboard = () => {
       if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
       if (activeFilters.city && p.city && !p.city.toLowerCase().includes(activeFilters.city.toLowerCase())) return false;
       if (activeFilters.religion && p.religion && p.religion.toLowerCase() !== activeFilters.religion.toLowerCase()) return false;
-      if (activeFilters.profession && p.profession && !p.profession.toLowerCase().includes(activeFilters.profession.toLowerCase())) return false;
+      if (activeFilters.profession && !((p.occupation || p.profession || '').toLowerCase().includes(activeFilters.profession.toLowerCase()))) return false;
+      if (activeFilters.caste && !(p.caste || '').toLowerCase().includes(activeFilters.caste.toLowerCase())) return false;
+      if (activeFilters.gotra && !(p.gotra || '').toLowerCase().includes(activeFilters.gotra.toLowerCase())) return false;
 
       return true;
     })
@@ -68,17 +66,12 @@ const Dashboard = () => {
     .sort((a, b) => b.matchScore - a.matchScore);
 
   const handleApplyFilters = () => {
-    setIsApplyingFilters(true);
-    // Simulate a brief delay for a more "professional" feel as requested
-    setTimeout(() => {
-      setActiveFilters(filters);
-      setIsFilterModalOpen(false);
-      setIsApplyingFilters(false);
-    }, 600);
+    setActiveFilters(filters);
+    setIsFilterModalOpen(false);
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { minAge: '', maxAge: '', city: '', religion: '', profession: '' };
+    const clearedFilters = { minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: '' };
     setFilters(clearedFilters);
     setActiveFilters(clearedFilters);
     setIsFilterModalOpen(false);
@@ -242,12 +235,34 @@ const Dashboard = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Profession</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Profession / Peshaa</label>
                 <input
                   type="text"
-                  placeholder="e.g. Engineer, Doctor"
+                  placeholder="e.g. Engineer, Doctor, Teacher"
                   value={filters.profession}
                   onChange={(e) => setFilters({ ...filters, profession: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caste / Jati</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Brahmin, Yadav, Rajput"
+                  value={filters.caste}
+                  onChange={(e) => setFilters({ ...filters, caste: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Gotra</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Kashyap, Bharadwaj"
+                  value={filters.gotra}
+                  onChange={(e) => setFilters({ ...filters, gotra: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors"
                 />
               </div>
@@ -262,7 +277,6 @@ const Dashboard = () => {
               </button>
               <Button
                 onClick={handleApplyFilters}
-                loading={isApplyingFilters}
                 className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-md hover:bg-red-700 transition-colors shadow-sm"
               >
                 Apply Filters

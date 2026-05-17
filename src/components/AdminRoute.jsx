@@ -1,12 +1,20 @@
-import React from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
-import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import { useToastContext } from '../context/ToastContext';
-import { useEffect } from 'react';
 
 const AdminRoute = ({ children }) => {
   const { currentUser, userProfile, loading } = useAuthContext();
+  const { showToast } = useToastContext();
+
+  const isAdmin = !loading && currentUser && userProfile?.role === 'admin';
+  const isAccessDenied = !loading && currentUser && userProfile && userProfile.role !== 'admin';
+
+  useEffect(() => {
+    if (isAccessDenied) {
+      showToast('Access Denied: Admins Only', 'error');
+    }
+  }, [isAccessDenied, showToast]);
 
   if (loading) {
     return (
@@ -16,25 +24,18 @@ const AdminRoute = ({ children }) => {
     );
   }
 
-  // If not logged in, redirect to login
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  // If logged in but not an admin, redirect with toast
-  const { showToast } = useToastContext();
-
-  useEffect(() => {
-    if (!loading && currentUser && userProfile && userProfile.role !== 'admin') {
-      showToast('Access Denied: Admins Only', 'error');
-    }
-  }, [loading, currentUser, userProfile, showToast]);
-
-  if (!loading && currentUser && userProfile?.role !== 'admin') {
+  if (isAccessDenied) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Authorized
+  if (!isAdmin) {
+    return null;
+  }
+
   return children;
 };
 

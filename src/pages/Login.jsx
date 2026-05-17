@@ -1,9 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../firebase/firebaseConfig'; // Using relative path safely
+import { auth, db } from '../firebase/firebaseConfig';
 import Button from '../components/Button';
+
+const OTP_ERROR_MESSAGES = {
+  'auth/too-many-requests': 'Bahut zyada attempts. Kuch der baad try karein.',
+  'auth/invalid-phone-number': 'Phone number sahi format mein nahi hai.',
+  'auth/quota-exceeded': 'SMS quota khatam ho gaya. Kal try karein.',
+  'auth/network-request-failed': 'Network error. Internet connection check karein.',
+  'auth/invalid-verification-code': 'OTP galat hai. Dobara check karein.',
+  'auth/code-expired': 'OTP expire ho gaya. Dobara bhejein.',
+  'auth/missing-phone-number': 'Phone number dalna zaroori hai.',
+};
+
+const getOtpErrorMsg = (err) =>
+  OTP_ERROR_MESSAGES[err.code] || 'Kuch galat hua. Dobara try karein.';
+
+const RESEND_COUNTDOWN = 60;
 
 const Login = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -11,43 +26,69 @@ const Login = () => {
   const [confirmationResult, setConfirmationResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+  const [resendTimer, setResendTimer] = useState(0);
+  const timerRef = useRef(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Setup invisible recaptcha
     if (!window.recaptchaVerifier) {
       window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': () => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber
-        }
+        size: 'invisible',
+        callback: () => {},
       });
     }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
+
+  const startResendTimer = () => {
+    setResendTimer(RESEND_COUNTDOWN);
+    timerRef.current = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const resetRecaptcha = () => {
+    if (window.recaptchaVerifier) {
+      window.recaptchaVerifier.render().then(widgetId => {
+        if (window.grecaptcha?.reset) window.grecaptcha.reset(widgetId);
+      }).catch(() => {});
+    }
+  };
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
-      const appVerifier = window.recaptchaVerifier;
-      const confirmResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      const confirmResult = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
       setConfirmationResult(confirmResult);
+      startResendTimer();
     } catch (err) {
       console.error(err);
-      setError('Failed to send OTP. Remember to provide valid SMS format.');
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.render().then(widgetId => {
-          if (typeof window.recaptchaReset === 'function') {
-            window.recaptchaReset(widgetId);
-          } else if (window.grecaptcha && typeof window.grecaptcha.reset === 'function') {
-            window.grecaptcha.reset(widgetId);
-          }
-        });
-      }
+      setError(getOtpErrorMsg(err));
+      resetRecaptcha();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    setError('');
+    setLoading(true);
+    try {
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
+      const confirmResult = await signInWithPhoneNumber(auth, formattedPhone, window.recaptchaVerifier);
+      setConfirmationResult(confirmResult);
+      startResendTimer();
+    } catch (err) {
+      setError(getOtpErrorMsg(err));
+      resetRecaptcha();
     } finally {
       setLoading(false);
     }
@@ -69,27 +110,20 @@ const Login = () => {
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        // Create new user profile document
-        const isAdmin = user.phoneNumber === '+918010703233' || user.phoneNumber === '8010703233';
+        // Create minimal user document — role is NEVER set client-side.
+        // To grant admin access, set role:'admin' directly in Firebase Console.
         await setDoc(userDocRef, {
           phone: user.phoneNumber,
           createdAt: serverTimestamp(),
-          hasProfile: false,
-          role: isAdmin ? 'admin' : 'user'
+          isProfileComplete: false,
         });
-      } else if (user.phoneNumber === '+918010703233' || user.phoneNumber === '8010703233') {
-        // Ensure existing user with this number also gets admin role
-        const data = userDoc.data();
-        if (data.role !== 'admin') {
-          await setDoc(userDocRef, { role: 'admin' }, { merge: true });
-        }
       }
 
       // Route to dashboard
       navigate('/dashboard');
     } catch (err) {
       console.error(err);
-      setError('Invalid OTP code. Please try again.');
+      setError(getOtpErrorMsg(err));
     } finally {
       setLoading(false);
     }
@@ -147,13 +181,24 @@ const Login = () => {
               {loading ? 'Verifying...' : 'Verify OTP'}
             </Button>
             
-            <button 
-              type="button"
-              className="text-sm text-secondary font-bold hover:underline bg-transparent border-none cursor-pointer mt-2"
-              onClick={() => { setConfirmationResult(null); setOtp(''); setError(''); }}
-            >
-              Change Phone Number
-            </button>
+            <div className="flex items-center justify-between mt-2">
+              <button
+                type="button"
+                className="text-sm text-secondary font-bold hover:underline bg-transparent border-none cursor-pointer"
+                onClick={() => { setConfirmationResult(null); setOtp(''); setError(''); if (timerRef.current) clearInterval(timerRef.current); setResendTimer(0); }}
+              >
+                Number badlein
+              </button>
+              <button
+                type="button"
+                disabled={resendTimer > 0 || loading}
+                onClick={handleResendOtp}
+                className="text-sm font-bold bg-transparent border-none cursor-pointer disabled:cursor-not-allowed"
+                style={{ color: resendTimer > 0 ? '#9CA3AF' : '#DC2626' }}
+              >
+                {resendTimer > 0 ? `Resend OTP (${resendTimer}s)` : 'Resend OTP'}
+              </button>
+            </div>
           </form>
         )}
 

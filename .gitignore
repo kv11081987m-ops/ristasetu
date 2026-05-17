@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android TWA — secrets and build outputs, never commit
+android-twa/gradle.properties
+android-twa/local.properties
+android-twa/*.keystore
+android-twa/*.apk
+android-twa/*.aab
+android-twa/app/build/

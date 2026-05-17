@@ -64,10 +64,12 @@ const ProfileCard = ({ profile, actionButton }) => {
   return (
     <div className="bg-surface rounded-lg shadow-md overflow-hidden border flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
       <div className="relative overflow-hidden group">
-        <img 
-          src={isPhotoHidden ? 'https://placehold.co/300x400/png?text=Photo+Protected' : (profile.photoUrl || 'https://placehold.co/300x400/png?text=No+Photo')} 
-          alt={profile.name} 
-          className={`w-full h-64 object-cover transition-all duration-500 ${isPhotoHidden ? 'blur-md scale-110' : ''}`} 
+        <img
+          src={isPhotoHidden ? 'https://placehold.co/300x400/png?text=Photo+Protected' : (profile.photoUrl || 'https://placehold.co/300x400/png?text=No+Photo')}
+          alt={profile.name}
+          loading="lazy"
+          decoding="async"
+          className={`w-full h-64 object-cover transition-all duration-500 ${isPhotoHidden ? 'blur-md scale-110' : ''}`}
           onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/300x400/png?text=No+Photo'; }}
         />
         {isPhotoHidden && (

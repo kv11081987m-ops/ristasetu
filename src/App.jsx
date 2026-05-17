@@ -18,6 +18,8 @@ import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
 import CompleteProfile from './pages/CompleteProfile';
 import Subscription from './pages/Subscription';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser, isProfileComplete } = useAuthContext();
@@ -74,6 +76,8 @@ const App = () => {
             <Route path="/premium" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
 
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfService />} />
           </Routes>
         </main>
         <BottomNav />

@@ -40,7 +40,7 @@ export const formatTime = (dateSource) => {
       minute: '2-digit',
       hour12: true
     }).format(date);
-  } catch (error) {
+  } catch {
     return '';
   }
 };

@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.ristasetu.twa",
+    "sha256_cert_fingerprints": [
+      "74:30:26:56:A1:B0:DC:7B:2B:A0:C4:05:AC:20:1E:17:97:7D:5B:30:66:64:93:A2:D7:2C:E2:8D:58:61:22:A2"
+    ]
+  }
+}]

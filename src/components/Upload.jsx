@@ -1,82 +1,78 @@
 import React, { useState } from 'react';
+import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 
 const Upload = () => {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
-  const [status, setStatus] = useState('idle'); // 'idle', 'uploading', 'success', 'error'
+  const [status, setStatus] = useState('idle'); // 'idle' | 'uploading' | 'success' | 'error'
   const [secureUrl, setSecureUrl] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
-    if (selected) {
-      setFile(selected);
-      setPreview(URL.createObjectURL(selected)); // local selected preview
-      setStatus('idle');
-      setSecureUrl('');
+    if (!selected) return;
+
+    const err = validateImageFile(selected);
+    if (err) {
+      setValidationError(err);
+      setFile(null);
+      setPreview('');
+      e.target.value = '';
+      return;
     }
+
+    setValidationError('');
+    setFile(selected);
+    setPreview(URL.createObjectURL(selected));
+    setStatus('idle');
+    setSecureUrl('');
   };
 
   const handleUpload = async () => {
     if (!file) return;
-
     setStatus('uploading');
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-
     try {
-      // Sending POST request to Cloudinary API
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${import.meta.env.VITE_CLOUDINARY_CLOUD_NAME}/image/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
-      
-      // Update state with secure URL
-      setSecureUrl(data.secure_url);
-      setPreview(data.secure_url); // Switch preview to uploaded remote image URL
+      const url = await uploadToCloudinary(file);
+      setSecureUrl(url);
+      setPreview(url);
       setStatus('success');
-      
-      console.log('Uploaded successfully! Secure URL:', data.secure_url);
-    } catch (error) {
-      console.error('Error uploading image:', error);
+    } catch {
       setStatus('error');
     }
   };
 
   return (
-    <div className="bg-surface shadow-md border rounded-lg p-6 max-w-md w-full mx-auto mt-6" style={{ margin: '1.5rem auto' }}>
+    <div className="bg-surface shadow-md border rounded-lg p-6 max-w-md w-full mx-auto mt-6">
       <h2 className="text-xl font-bold mb-4 text-center text-primary">Upload Profile Photo</h2>
-      
+
       <div className="flex flex-col gap-4">
-        {/* Modern styled file input via label wrapping */}
         <div className="p-4 text-center rounded-lg cursor-pointer" style={{ border: '2px dashed var(--border)' }}>
           <label className="cursor-pointer font-medium text-secondary hover:underline" style={{ display: 'block', padding: '1rem' }}>
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleFileChange} 
-              className="hidden" 
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+              className="hidden"
               style={{ display: 'none' }}
             />
-            {file ? file.name : 'Click anywhere inside to select an image'}
+            {file ? file.name : 'Click to select an image'}
           </label>
+          <p className="text-xs text-gray-400 mt-1">JPG, PNG ya WebP — max 5MB</p>
         </div>
 
-        {/* Local and securely uploaded Image Preview Array */}
+        {validationError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+            {validationError}
+          </p>
+        )}
+
         {preview && (
-          <div className="mt-4 flex flex-col items-center">
-            <img 
-              src={preview} 
-              alt="Upload Preview" 
-              className="rounded-lg shadow-sm" 
-              style={{ width: '100%', maxHeight: '300px', objectFit: 'cover' }}
+          <div className="mt-2 flex flex-col items-center">
+            <img
+              src={preview}
+              alt="Preview"
+              className="rounded-lg shadow-sm w-full"
+              style={{ maxHeight: '300px', objectFit: 'cover' }}
             />
             {secureUrl && (
               <a href={secureUrl} target="_blank" rel="noreferrer" className="text-xs text-secondary mt-2 underline">
@@ -86,25 +82,22 @@ const Upload = () => {
           </div>
         )}
 
-        {/* Status Text Area */}
-        {status === 'success' && <p className="text-sm font-bold text-center" style={{ color: '#16A34A' }}>Upload completed!</p>}
-        {status === 'error' && <p className="text-sm font-bold text-center" style={{ color: '#DC2626' }}>Upload failed. Watch the console logs and try again.</p>}
+        {status === 'success' && <p className="text-sm font-bold text-center text-green-600">Upload completed!</p>}
+        {status === 'error' && <p className="text-sm font-bold text-center text-red-600">Upload failed. Please try again.</p>}
 
-        {/* Cloudinary Trigger Button */}
         <button
           onClick={handleUpload}
           disabled={!file || status === 'uploading'}
           className="mt-2 text-white font-bold rounded-md"
-          style={{ 
-            backgroundColor: status === 'uploading' ? 'var(--text-light)' : 'var(--primary)', 
-            padding: '0.75rem', 
-            border: 'none', 
+          style={{
+            backgroundColor: status === 'uploading' ? 'var(--text-light)' : 'var(--primary)',
+            padding: '0.75rem',
+            border: 'none',
             cursor: (!file || status === 'uploading') ? 'not-allowed' : 'pointer',
-            transition: 'opacity 0.2s',
-            width: '100%'
+            width: '100%',
           }}
         >
-          {status === 'uploading' ? 'Uploading...' : 'Upload to Cloudinary'}
+          {status === 'uploading' ? 'Uploading...' : 'Upload Photo'}
         </button>
       </div>
     </div>

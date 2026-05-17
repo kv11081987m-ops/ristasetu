@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -11,19 +12,23 @@ const Search = () => {
   const navigate = useNavigate();
   const [filters, setFilters] = useState({
     minAge: 18, maxAge: 50,
-    religion: 'All', maritalStatus: 'All'
+    religion: 'All', caste: '', gotra: '', state: 'All'
   });
-  
+
   const handleFilterChange = (e) => setFilters({...filters, [e.target.name]: e.target.value});
 
   const filteredProfiles = profiles.filter(p => {
     if (!currentUser) return false;
     if (p.id === currentUser.uid) return false;
-    
-    if (p.age < filters.minAge || p.age > filters.maxAge) return false;
+    if (p.role === 'admin') return false;
+
+    const age = parseInt(p.age) || 0;
+    if (age < parseInt(filters.minAge) || age > parseInt(filters.maxAge)) return false;
     if (filters.religion !== 'All' && p.religion !== filters.religion) return false;
-    if (filters.maritalStatus !== 'All' && p.maritalStatus !== filters.maritalStatus) return false;
-    
+    if (filters.state !== 'All' && p.state !== filters.state) return false;
+    if (filters.caste && !(p.caste || '').toLowerCase().includes(filters.caste.toLowerCase())) return false;
+    if (filters.gotra && !(p.gotra || '').toLowerCase().includes(filters.gotra.toLowerCase())) return false;
+
     return true;
   });
 
@@ -58,14 +63,28 @@ const Search = () => {
             </div>
             
             <div className="form-group">
-              <label className="form-label">Marital Status</label>
-              <select name="maritalStatus" className="form-select" value={filters.maritalStatus} onChange={handleFilterChange}>
-                <option>All</option>
-                <option>Never Married</option>
-                <option>Divorced</option>
-                <option>Awaiting Divorce</option>
-                <option>Widowed</option>
+              <label className="form-label">State / Rajya</label>
+              <select name="state" className="form-select" value={filters.state} onChange={handleFilterChange}>
+                <option value="All">Sabhi</option>
+                <option value="Uttar Pradesh">Uttar Pradesh</option>
+                <option value="Bihar">Bihar</option>
+                <option value="Madhya Pradesh">Madhya Pradesh</option>
+                <option value="Uttarakhand">Uttarakhand</option>
+                <option value="Delhi">Delhi</option>
+                <option value="Maharashtra">Maharashtra</option>
+                <option value="Rajasthan">Rajasthan</option>
+                <option value="Haryana">Haryana</option>
               </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Caste / Jati</label>
+              <input type="text" name="caste" className="form-input" placeholder="e.g. Brahmin, Yadav" value={filters.caste} onChange={handleFilterChange} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Gotra</label>
+              <input type="text" name="gotra" className="form-input" placeholder="e.g. Kashyap, Bharadwaj" value={filters.gotra} onChange={handleFilterChange} />
             </div>
           </div>
         </div>

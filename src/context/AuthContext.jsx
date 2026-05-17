@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase/firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
@@ -21,6 +21,11 @@ export const AuthProvider = ({ children }) => {
           
           if (userDoc.exists()) {
             const data = userDoc.data();
+            // If admin has blocked this user, force sign-out immediately
+            if (data.isBlocked) {
+              await signOut(auth);
+              return;
+            }
             setUserProfile(data);
             setIsProfileComplete(data.isProfileComplete || false);
           } else {

@@ -50,6 +50,5 @@ export const calculateMatchPercentage = (user, profile) => {
     if (matched) totalScore += 7;
   }
 
-  // Ensure minimum 60% match for "recommended" feel, unless very different
-  return Math.max(60, Math.min(100, totalScore + 40)); 
+  return Math.min(100, totalScore);
 };

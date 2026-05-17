@@ -1,180 +1,162 @@
-import React, { createContext, useContext, useState } from 'react';
-import { initialInterests, initialShortlists, initialChats } from '../data/mockData';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { useEffect } from 'react';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, limit, orderBy } from 'firebase/firestore';
+import { useAuthContext } from './AuthContext';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null); 
+  const { currentUser: authUser } = useAuthContext();
+
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [interests, setInterests] = useState([]);
   const [shortlists, setShortlists] = useState([]);
   const [chats, setChats] = useState([]);
 
+  // All profiles — only start listener once Firebase Auth has restored the session.
   useEffect(() => {
-    setLoading(true);
-    
-    // Profiles Listener
-    const unsubProfiles = onSnapshot(collection(db, 'users'), 
-      (snapshot) => {
-        setProfiles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setLoading(false);
-      }
+    if (!authUser?.uid) return;
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('isProfileComplete', '==', true),
+      orderBy('createdAt', 'desc'),
+      limit(200)
     );
+    const unsub = onSnapshot(usersQuery, (snapshot) => {
+      setProfiles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [authUser?.uid]);
 
-    // Interests Listener
-    const unsubInterests = onSnapshot(collection(db, 'interests'), 
-      (snapshot) => {
-        setInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    );
+  // Merge two interest subscriptions (sent + received) into one state array
+  const interestMapRef = useRef(new Map());
+  useEffect(() => {
+    const uid = authUser?.uid;
+    const map = interestMapRef.current;
 
-    // Shortlists Listener
-    const unsubShortlists = onSnapshot(collection(db, 'shortlists'), 
-      (snapshot) => {
-        setShortlists(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    );
-
-    // Chats Listener
-    const unsubChats = onSnapshot(collection(db, 'chats'), 
-      (snapshot) => {
-        setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }
-    );
-
-    return () => {
-      unsubProfiles();
-      unsubInterests();
-      unsubShortlists();
-      unsubChats();
-    };
-  }, []);
-
-  const login = (phone) => {
-    // For admin, we could have a hardcoded check or flag
-    if (phone === 'admin') {
-      setCurrentUser({ id: 'admin', name: 'Administrator', role: 'admin' });
-      return true;
+    if (!uid) {
+      map.clear();
+      setInterests([]); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
     }
-    const user = profiles.find(p => p.phone === phone);
-    if (user) {
-      setCurrentUser(user);
-      return true;
-    }
-    return false;
-  };
 
-  const logout = () => setCurrentUser(null);
+    const sync = () => setInterests([...map.values()]);
 
-  const register = (profileData) => {
-    const newProfile = {
-      ...profileData,
-      id: `p${Date.now()}`,
-      isVerified: true, // Auto verified for MVP demo
+    const handleChanges = (snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'removed') {
+          map.delete(change.doc.id);
+        } else {
+          map.set(change.doc.id, { id: change.doc.id, ...change.doc.data() });
+        }
+      });
+      sync();
     };
-    setProfiles([...profiles, newProfile]);
-    setCurrentUser(newProfile);
-  };
+
+    const unsubSent = onSnapshot(
+      query(collection(db, 'interests'), where('senderId', '==', uid)),
+      handleChanges
+    );
+    const unsubReceived = onSnapshot(
+      query(collection(db, 'interests'), where('receiverId', '==', uid)),
+      handleChanges
+    );
+
+    return () => { unsubSent(); unsubReceived(); map.clear(); };
+  }, [authUser?.uid]);
+
+  // Shortlists — only current user's
+  useEffect(() => {
+    const uid = authUser?.uid;
+    if (!uid) {
+      setShortlists([]); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    return onSnapshot(
+      query(collection(db, 'shortlists'), where('userId', '==', uid)),
+      (snap) => setShortlists(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+  }, [authUser?.uid]);
+
+  // Chats — only chats where user is a participant
+  useEffect(() => {
+    const uid = authUser?.uid;
+    if (!uid) {
+      setChats([]); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    return onSnapshot(
+      query(collection(db, 'chats'), where('participants', 'array-contains', uid)),
+      (snap) => setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+  }, [authUser?.uid]);
 
   const sendInterest = async (receiverId, senderId) => {
     if (!senderId) return;
-    try {
-      await addDoc(collection(db, 'interests'), {
-        senderId,
-        receiverId,
-        status: 'pending',
-        createdAt: serverTimestamp()
-      });
-    } catch (error) {
-      console.error("Error sending interest:", error);
-    }
+    await addDoc(collection(db, 'interests'), {
+      senderId,
+      receiverId,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
   };
 
   const acceptInterest = async (interestId) => {
-    try {
-      const interestRef = doc(db, 'interests', interestId);
-      await updateDoc(interestRef, { status: 'accepted' });
-      
-      const interest = interests.find(i => i.id === interestId);
-      if (interest) {
-        await addDoc(collection(db, 'chats'), {
-          participants: [interest.senderId, interest.receiverId],
-          messages: [],
-          createdAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
-      console.error("Error accepting interest:", error);
+    const interestRef = doc(db, 'interests', interestId);
+    await updateDoc(interestRef, { status: 'accepted' });
+
+    const interest = interests.find(i => i.id === interestId);
+    if (interest) {
+      await addDoc(collection(db, 'chats'), {
+        participants: [interest.senderId, interest.receiverId],
+        createdAt: serverTimestamp()
+      });
     }
   };
 
   const declineInterest = async (interestId) => {
-    try {
-      const interestRef = doc(db, 'interests', interestId);
-      await updateDoc(interestRef, { status: 'declined' });
-    } catch (error) {
-      console.error("Error declining interest:", error);
-    }
+    await updateDoc(doc(db, 'interests', interestId), { status: 'declined' });
   };
 
   const toggleShortlist = async (profileId, userId) => {
     if (!userId) return;
-    const exists = shortlists.find(s => s.userId === userId && s.profileId === profileId);
-    try {
-      if (exists) {
-        await deleteDoc(doc(db, 'shortlists', exists.id));
-      } else {
-        await addDoc(collection(db, 'shortlists'), {
-          userId,
-          profileId,
-          createdAt: serverTimestamp()
-        });
-      }
-    } catch (error) {
-      console.error("Error toggling shortlist:", error);
+    const exists = shortlists.find(s => s.profileId === profileId);
+    if (exists) {
+      await deleteDoc(doc(db, 'shortlists', exists.id));
+    } else {
+      await addDoc(collection(db, 'shortlists'), {
+        userId,
+        profileId,
+        createdAt: serverTimestamp()
+      });
     }
   };
 
   const sendMessage = async (chatId, text, senderId) => {
     if (!senderId) return;
-    try {
-      const chatRef = doc(db, 'chats', chatId);
-      await updateDoc(chatRef, {
-        messages: arrayUnion({
-          id: `m${Date.now()}`,
-          senderId,
-          text,
-          timestamp: new Date().toISOString()
-        })
-      });
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  // Admin functions
-  const verifyProfile = (profileId) => {
-    setProfiles(profiles.map(p => p.id === profileId ? { ...p, isVerified: true } : p));
-  };
-  
-  const banProfile = (profileId) => {
-    setProfiles(profiles.filter(p => p.id !== profileId));
+    await addDoc(collection(db, 'chats', chatId, 'messages'), {
+      senderId,
+      text,
+      timestamp: serverTimestamp(),
+    });
+    // Update lastMessage for chat list preview
+    await updateDoc(doc(db, 'chats', chatId), {
+      lastMessage: text,
+      lastMessageAt: serverTimestamp(),
+    });
   };
 
   return (
     <AppContext.Provider value={{
-      currentUser, profiles, loading, interests, shortlists, chats,
-      login, logout, register, sendInterest, acceptInterest, declineInterest, toggleShortlist, sendMessage,
-      verifyProfile, banProfile
+      profiles, loading, interests, shortlists, chats,
+      sendInterest, acceptInterest, declineInterest, toggleShortlist, sendMessage,
     }}>
       {children}
     </AppContext.Provider>
   );
-}
+};
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAppContext = () => useContext(AppContext);

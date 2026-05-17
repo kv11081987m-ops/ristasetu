@@ -4,6 +4,7 @@ import Button from '../components/Button';
 import { Check, Star, Crown, Zap, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+// eslint-disable-next-line no-unused-vars
 const PlanCard = ({ title, price, duration, features, icon: Icon, color, popular, isCurrent }) => (
   <div className={`relative bg-white rounded-2xl shadow-xl border-2 transition-all duration-300 hover:-translate-y-2 flex flex-col ${popular ? 'border-red-600 scale-105 z-10' : 'border-gray-100 hover:border-red-200'}`}>
     {popular && (

@@ -1,7 +1,9 @@
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import ProfileCard from '../components/ProfileCard';
+import Button from '../components/Button';
 import { Heart, Send, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 
 const TabButton = ({ name, label, count, activeTab, setActiveTab }) => (

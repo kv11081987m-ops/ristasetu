@@ -20,8 +20,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    setLoading(true);
-    const unsubscribe = onSnapshot(collection(db, 'users'), 
+    const unsubscribe = onSnapshot(collection(db, 'users'),
       (querySnapshot) => {
         const usersList = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -44,27 +43,34 @@ const AdminDashboard = () => {
       setUpdatingId(userId);
       const userRef = doc(db, 'users', userId);
       const newStatus = !currentStatus;
-      
       await updateDoc(userRef, {
         isVerified: newStatus,
         kycStatus: newStatus ? 'verified' : 'not_started'
       });
-
-      // Update local state
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, isVerified: newStatus } : user
-      ));
-      
-      setNotification({
-        message: `User ${newStatus ? 'verified' : 'unverified'} successfully!`,
-        type: 'success'
-      });
-      
-      // Auto-hide notification
+      setUsers(users.map(u => u.id === userId ? { ...u, isVerified: newStatus } : u));
+      setNotification({ message: `User ${newStatus ? 'verified' : 'unverified'} successfully!`, type: 'success' });
       setTimeout(() => setNotification(null), 3000);
     } catch (error) {
       console.error("Error toggling verification:", error);
       alert("Failed to update verification status.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const toggleBlock = async (userId, currentBlockedStatus) => {
+    if (!window.confirm(currentBlockedStatus ? 'Is user ko unblock karein?' : 'Is user ko block karein? Wo login nahi kar paayega.')) return;
+    try {
+      setUpdatingId(userId);
+      const userRef = doc(db, 'users', userId);
+      const newStatus = !currentBlockedStatus;
+      await updateDoc(userRef, { isBlocked: newStatus });
+      setUsers(users.map(u => u.id === userId ? { ...u, isBlocked: newStatus } : u));
+      setNotification({ message: `User ${newStatus ? 'blocked' : 'unblocked'} successfully!`, type: newStatus ? 'error' : 'success' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (error) {
+      console.error("Error toggling block:", error);
+      alert("Failed to update block status.");
     } finally {
       setUpdatingId(null);
     }
@@ -256,16 +262,29 @@ const AdminDashboard = () => {
                         {formatDate(user.createdAt)}
                       </td>
                       <td className="p-5 text-right sm:text-left">
-                        <Button
-                          onClick={() => toggleVerification(user.id, user.isVerified)}
-                          loading={updatingId === user.id}
-                          variant={user.isVerified ? 'outline' : 'primary'}
-                          className={`min-w-[140px] px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm ${
-                            !user.isVerified ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-100' : ''
-                          }`}
-                        >
-                          {user.isVerified ? 'Revoke Access' : 'Authorize User'}
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            onClick={() => toggleVerification(user.id, user.isVerified)}
+                            loading={updatingId === user.id}
+                            variant={user.isVerified ? 'outline' : 'primary'}
+                            className={`min-w-[130px] px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm ${
+                              !user.isVerified ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-100' : ''
+                            }`}
+                          >
+                            {user.isVerified ? 'Revoke' : 'Verify'}
+                          </Button>
+                          <button
+                            onClick={() => toggleBlock(user.id, user.isBlocked)}
+                            disabled={updatingId === user.id}
+                            className={`min-w-[100px] px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm border disabled:opacity-50 ${
+                              user.isBlocked
+                                ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                            }`}
+                          >
+                            {user.isBlocked ? 'Unblock' : 'Block'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

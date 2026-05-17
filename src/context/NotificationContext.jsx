@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuthContext } from './AuthContext';
 
 const NotificationContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotificationContext = () => useContext(NotificationContext);
 
 export const NotificationProvider = ({ children }) => {
@@ -13,11 +14,7 @@ export const NotificationProvider = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!currentUser) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
+    if (!currentUser) return;
 
     // Removed orderBy('createdAt', 'desc') to avoid index requirement.
     // We will sort the data locally instead.
@@ -94,12 +91,12 @@ export const NotificationProvider = ({ children }) => {
   };
 
   return (
-    <NotificationContext.Provider value={{ 
-      notifications, 
-      unreadCount, 
-      markAsRead, 
+    <NotificationContext.Provider value={{
+      notifications: currentUser ? notifications : [],
+      unreadCount: currentUser ? unreadCount : 0,
+      markAsRead,
       markAllAsRead,
-      sendNotification 
+      sendNotification
     }}>
       {children}
     </NotificationContext.Provider>
