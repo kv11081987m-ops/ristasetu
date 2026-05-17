@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Auto-generated from .env at build time
+public/firebase-messaging-sw.js
+
 # Android TWA — secrets and build outputs, never commit
 android-twa/gradle.properties
 android-twa/local.properties
@@ -30,3 +33,6 @@ android-twa/*.keystore
 android-twa/*.apk
 android-twa/*.aab
 android-twa/app/build/
+android-twa/.gradle/
+android-twa/build/
+android-twa/*.idsig

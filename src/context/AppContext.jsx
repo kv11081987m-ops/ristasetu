@@ -93,8 +93,31 @@ export const AppProvider = ({ children }) => {
     );
   }, [authUser?.uid]);
 
+  const DAILY_INTEREST_LIMIT = 10;
+  const PENDING_INTEREST_LIMIT = 20;
+
   const sendInterest = async (receiverId, senderId) => {
     if (!senderId) return;
+
+    const now = Date.now();
+    const msIn24h = 24 * 60 * 60 * 1000;
+
+    const mySent = interests.filter(i => i.senderId === senderId);
+
+    const todayCount = mySent.filter(i => {
+      const ts = i.createdAt?.toDate?.() ?? (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000) : null);
+      return ts && now - ts.getTime() < msIn24h;
+    }).length;
+
+    if (todayCount >= DAILY_INTEREST_LIMIT) {
+      throw new Error('DAILY_LIMIT');
+    }
+
+    const pendingCount = mySent.filter(i => i.status === 'pending').length;
+    if (pendingCount >= PENDING_INTEREST_LIMIT) {
+      throw new Error('PENDING_LIMIT');
+    }
+
     await addDoc(collection(db, 'interests'), {
       senderId,
       receiverId,

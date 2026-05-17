@@ -1,25 +1,32 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import { useAuthContext } from './context/AuthContext';
 import AdminRoute from './components/AdminRoute';
 
-// Pages
-import Splash from './pages/Splash';
-import Login from './pages/Login';
-import Register from './Register';
-import Dashboard from './pages/Dashboard';
-import Search from './pages/Search';
-import ProfileDetails from './pages/ProfileDetails';
-import Interests from './pages/Interests';
-import Chat from './pages/Chat';
-import Settings from './pages/Settings';
-import AdminDashboard from './pages/AdminDashboard';
-import CompleteProfile from './pages/CompleteProfile';
-import Subscription from './pages/Subscription';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
+// Route-level code splitting — each page loads only when navigated to
+const Splash        = lazy(() => import('./pages/Splash'));
+const Login         = lazy(() => import('./pages/Login'));
+const Register      = lazy(() => import('./Register'));
+const Dashboard     = lazy(() => import('./pages/Dashboard'));
+const Search        = lazy(() => import('./pages/Search'));
+const ProfileDetails = lazy(() => import('./pages/ProfileDetails'));
+const Interests     = lazy(() => import('./pages/Interests'));
+const Chat          = lazy(() => import('./pages/Chat'));
+const Settings      = lazy(() => import('./pages/Settings'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const CompleteProfile = lazy(() => import('./pages/CompleteProfile'));
+const Subscription  = lazy(() => import('./pages/Subscription'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const KYC           = lazy(() => import('./pages/KYC'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser, isProfileComplete } = useAuthContext();
@@ -56,29 +63,30 @@ const App = () => {
       <div className="app-layout">
         <Navbar />
         <main className="app-main">
-          <Routes>
-            <Route path="/splash" element={<PublicRoute><Splash /></PublicRoute>} />
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/splash" element={<PublicRoute><Splash /></PublicRoute>} />
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
-            {/* If user hits root, send them to dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            
-            <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            
-            <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-            <Route path="/profile/:id" element={<ProtectedRoute><ProfileDetails /></ProtectedRoute>} />
-            <Route path="/interests" element={<ProtectedRoute><Interests /></ProtectedRoute>} />
-            <Route path="/my-interests" element={<ProtectedRoute><Interests /></ProtectedRoute>} />
-            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/premium" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-          </Routes>
+              <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
+              <Route path="/profile/:id" element={<ProtectedRoute><ProfileDetails /></ProtectedRoute>} />
+              <Route path="/interests" element={<ProtectedRoute><Interests /></ProtectedRoute>} />
+              <Route path="/my-interests" element={<ProtectedRoute><Interests /></ProtectedRoute>} />
+              <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/kyc" element={<ProtectedRoute><KYC /></ProtectedRoute>} />
+              <Route path="/premium" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+
+              <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
+            </Routes>
+          </Suspense>
         </main>
         <BottomNav />
       </div>

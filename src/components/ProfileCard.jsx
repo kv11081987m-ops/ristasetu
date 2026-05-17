@@ -5,6 +5,7 @@ import VerifiedBadge from './VerifiedBadge';
 import Button from './Button';
 import { useAuthContext } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
+import { useToastContext } from '../context/ToastContext';
 
 import { calculateMatchPercentage } from '../utils/matchUtils';
 import { CheckCircle, Clock } from 'lucide-react';
@@ -12,6 +13,7 @@ import { CheckCircle, Clock } from 'lucide-react';
 const ProfileCard = ({ profile, actionButton }) => {
   const { isProfileComplete, userProfile } = useAuthContext();
   const { sendInterest, interests } = useAppContext();
+  const { showToast } = useToastContext();
 
   const existingInterest = interests.find(
     i => (i.senderId === userProfile?.uid && i.receiverId === profile.id) || 
@@ -38,9 +40,22 @@ const ProfileCard = ({ profile, actionButton }) => {
     setCountdown(15);
 
     // Save to Firestore after 15 seconds
-    timerRef.current = setTimeout(() => {
-      sendInterest(profile.id, userProfile.uid);
-      setInterestStatus('sent');
+    timerRef.current = setTimeout(async () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      try {
+        await sendInterest(profile.id, userProfile.uid);
+        setInterestStatus('sent');
+      } catch (err) {
+        setInterestStatus('idle');
+        setCountdown(15);
+        if (err.message === 'DAILY_LIMIT') {
+          showToast('Aaj ki limit poori ho gayi (10 interests/day)', 'error');
+        } else if (err.message === 'PENDING_LIMIT') {
+          showToast('Bahut saare pending interests hain. Pehle kuch responses ka wait karein.', 'error');
+        } else {
+          showToast('Interest bhejne mein error. Dobara try karein.', 'error');
+        }
+      }
     }, 15000);
 
     // Update visual countdown

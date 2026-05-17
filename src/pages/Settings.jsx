@@ -16,7 +16,6 @@ import {
 import { auth, db } from '../firebase/firebaseConfig';
 import { signOut, deleteUser } from 'firebase/auth';
 import { doc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
-import { useToastContext } from '../context/ToastContext';
 import { useNavigate, Link } from 'react-router-dom';
 
 // eslint-disable-next-line no-unused-vars
@@ -104,7 +103,6 @@ const DeleteAccountModal = ({ onConfirm, onCancel, isDeleting, error }) => (
 // ── Main component ────────────────────────────────────────────────────────
 const Settings = () => {
   const { currentUser, userProfile } = useAuthContext();
-  const { showToast } = useToastContext();
   const navigate = useNavigate();
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -227,9 +225,13 @@ const Settings = () => {
           />
           <SettingsItem
             icon={Shield}
-            title="Verification Status"
-            description={userProfile?.kycStatus === 'verified' ? 'You are fully verified' : 'Complete your KYC to get verified'}
-            onClick={() => showToast('Verification portal coming soon!', 'info')}
+            title="KYC Verification"
+            description={
+              userProfile?.kycStatus === 'verified' ? 'Verified — Identity confirmed' :
+              userProfile?.kycStatus === 'submitted' ? 'Documents submitted — Review pending' :
+              'Upload government ID to get verified'
+            }
+            to="/kyc"
           />
         </div>
 

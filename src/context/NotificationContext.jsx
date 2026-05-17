@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuthContext } from './AuthContext';
+import { useToastContext } from './ToastContext';
+import { useFCM } from '../hooks/useFCM';
 
 const NotificationContext = createContext();
 
@@ -10,8 +12,11 @@ export const useNotificationContext = () => useContext(NotificationContext);
 
 export const NotificationProvider = ({ children }) => {
   const { currentUser } = useAuthContext();
+  const { showToast } = useToastContext();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useFCM(currentUser, showToast);
 
   useEffect(() => {
     if (!currentUser) return;

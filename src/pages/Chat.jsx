@@ -4,7 +4,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Send, MessageSquare, Home } from 'lucide-react';
 import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, getDoc } from 'firebase/firestore';
 import Button from '../components/Button';
 
 const formatTime = (ts) => {
@@ -20,13 +20,37 @@ const Chat = () => {
   const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
+  const [fetchedProfiles, setFetchedProfiles] = useState({});
   const bottomRef = useRef(null);
 
   const myChats = currentUser ? chats.filter(c => c.participants?.includes(currentUser.uid)) : [];
   const activeChat = myChats.find(c => c.id === activeChatId);
+
+  const findProfile = (id) => profiles.find(p => p.id === id) || fetchedProfiles[id];
+
   const otherUser = activeChat
-    ? profiles.find(p => p.id === activeChat.participants.find(id => id !== currentUser.uid))
+    ? findProfile(activeChat.participants.find(id => id !== currentUser.uid))
     : null;
+
+  // Fetch profiles of chat partners not in the 200-profile limit
+  useEffect(() => {
+    if (!currentUser || myChats.length === 0) return;
+    const missingIds = myChats
+      .map(c => c.participants.find(id => id !== currentUser.uid))
+      .filter(id => id && !profiles.find(p => p.id === id) && !fetchedProfiles[id]);
+    if (missingIds.length === 0) return;
+    Promise.all(
+      missingIds.map(async id => {
+        const snap = await getDoc(doc(db, 'users', id));
+        return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      })
+    ).then(results => {
+      const map = {};
+      results.forEach(p => { if (p) map[p.id] = p; });
+      setFetchedProfiles(prev => ({ ...prev, ...map }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myChats.length, profiles.length]);
 
   // Subscribe to messages subcollection
   useEffect(() => {
@@ -77,7 +101,7 @@ const Chat = () => {
         <div className="flex-1 overflow-y-auto">
           {myChats.map(chat => {
             const partnerId = chat.participants.find(id => id !== currentUser.uid);
-            const partner = profiles.find(p => p.id === partnerId);
+            const partner = findProfile(partnerId);
             return (
               <div
                 key={chat.id}

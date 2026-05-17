@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node scripts/copy-well-known.mjs",
+    "dev": "node scripts/generate-fcm-sw.mjs && vite",
+    "build": "node scripts/generate-fcm-sw.mjs && vite build && node scripts/copy-well-known.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

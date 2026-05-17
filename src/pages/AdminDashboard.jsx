@@ -248,15 +248,27 @@ const AdminDashboard = () => {
                         {user.phone || user.email || <span className="italic text-gray-300">No contact</span>}
                       </td>
                       <td className="p-5">
-                        {user.isVerified ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider border border-green-100">
-                            <CheckCircle size={12} /> Verified
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider border border-gray-200">
-                            <Clock size={12} /> Pending
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-1.5">
+                          {user.isVerified ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-wider border border-green-100">
+                              <CheckCircle size={12} /> Verified
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 text-gray-500 text-[10px] font-black uppercase tracking-wider border border-gray-200">
+                              <Clock size={12} /> Pending
+                            </span>
+                          )}
+                          {user.kycStatus === 'submitted' && !user.isVerified && (
+                            <a
+                              href={user.kycDocumentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
+                            >
+                              📄 View KYC Doc ({user.kycDocumentType})
+                            </a>
+                          )}
+                        </div>
                       </td>
                       <td className="p-5 text-sm text-gray-500 font-medium">
                         {formatDate(user.createdAt)}
