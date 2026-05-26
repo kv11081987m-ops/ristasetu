@@ -127,48 +127,67 @@ export const AppProvider = ({ children }) => {
   };
 
   const acceptInterest = async (interestId) => {
-    const interestRef = doc(db, 'interests', interestId);
-    await updateDoc(interestRef, { status: 'accepted' });
+    try {
+      const interestRef = doc(db, 'interests', interestId);
+      await updateDoc(interestRef, { status: 'accepted' });
 
-    const interest = interests.find(i => i.id === interestId);
-    if (interest) {
-      await addDoc(collection(db, 'chats'), {
-        participants: [interest.senderId, interest.receiverId],
-        createdAt: serverTimestamp()
-      });
+      const interest = interests.find(i => i.id === interestId);
+      if (interest) {
+        await addDoc(collection(db, 'chats'), {
+          participants: [interest.senderId, interest.receiverId],
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.error('acceptInterest error:', err);
+      throw err;
     }
   };
 
   const declineInterest = async (interestId) => {
-    await updateDoc(doc(db, 'interests', interestId), { status: 'declined' });
+    try {
+      await updateDoc(doc(db, 'interests', interestId), { status: 'declined' });
+    } catch (err) {
+      console.error('declineInterest error:', err);
+      throw err;
+    }
   };
 
   const toggleShortlist = async (profileId, userId) => {
     if (!userId) return;
-    const exists = shortlists.find(s => s.profileId === profileId);
-    if (exists) {
-      await deleteDoc(doc(db, 'shortlists', exists.id));
-    } else {
-      await addDoc(collection(db, 'shortlists'), {
-        userId,
-        profileId,
-        createdAt: serverTimestamp()
-      });
+    try {
+      const exists = shortlists.find(s => s.profileId === profileId);
+      if (exists) {
+        await deleteDoc(doc(db, 'shortlists', exists.id));
+      } else {
+        await addDoc(collection(db, 'shortlists'), {
+          userId,
+          profileId,
+          createdAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.error('toggleShortlist error:', err);
+      throw err;
     }
   };
 
   const sendMessage = async (chatId, text, senderId) => {
     if (!senderId) return;
-    await addDoc(collection(db, 'chats', chatId, 'messages'), {
-      senderId,
-      text,
-      timestamp: serverTimestamp(),
-    });
-    // Update lastMessage for chat list preview
-    await updateDoc(doc(db, 'chats', chatId), {
-      lastMessage: text,
-      lastMessageAt: serverTimestamp(),
-    });
+    try {
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        senderId,
+        text,
+        timestamp: serverTimestamp(),
+      });
+      await updateDoc(doc(db, 'chats', chatId), {
+        lastMessage: text,
+        lastMessageAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('sendMessage error:', err);
+      throw err;
+    }
   };
 
   return (

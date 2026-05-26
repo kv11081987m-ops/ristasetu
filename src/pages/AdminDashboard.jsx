@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDocs, query, orderBy, limit, startAfter } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { 
   ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock, 
@@ -9,34 +9,55 @@ import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import { formatDate } from '../utils/formatDate';
 
+const PAGE_SIZE = 20;
+
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [lastDoc, setLastDoc] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
   const [notification, setNotification] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const navigate = useNavigate();
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'users'),
-      (querySnapshot) => {
-        const usersList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+    const fetchUsers = async () => {
+      try {
+        const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
+        const snap = await getDocs(q);
+        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         setUsers(usersList);
-        setLoading(false);
-      },
-      (error) => {
+        setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+      } catch (error) {
         console.error("Error fetching users:", error);
+      } finally {
         setLoading(false);
       }
-    );
-
-    return () => unsubscribe();
+    };
+    fetchUsers();
   }, []);
+
+  const loadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE), startAfter(lastDoc));
+      const snap = await getDocs(q);
+      const newUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setUsers(prev => [...prev, ...newUsers]);
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Error loading more users:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const toggleVerification = async (userId, currentStatus) => {
     try {
@@ -313,6 +334,18 @@ const AdminDashboard = () => {
               </div>
             )}
           </div>
+
+          {!searchTerm && hasMore && (
+            <div className="p-6 flex justify-center border-t border-gray-50">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-6 py-2.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-xl font-bold text-sm hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? <><Loader2 size={16} className="animate-spin" /> Loading...</> : 'Load More Users'}
+              </button>
+            </div>
+          )}
         </main>
 
         {/* Notifications */}

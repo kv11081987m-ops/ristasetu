@@ -33,7 +33,7 @@ const AdminRoute = ({ children }) => {
   }
 
   if (!isAdmin) {
-    return null;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

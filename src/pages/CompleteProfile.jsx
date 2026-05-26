@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
@@ -91,7 +91,7 @@ const CompleteProfile = () => {
         kycStatus: 'not_started',
         isPremium: false,
         premiumPlan: 'none',
-        createdAt: new Date().toISOString()
+        createdAt: serverTimestamp()
       };
 
       await setDoc(doc(db, 'users', currentUser.uid), profileData, { merge: true });
@@ -103,8 +103,7 @@ const CompleteProfile = () => {
       // 4. Redirect
       navigate('/dashboard');
     } catch (err) {
-      console.error("Firebase Error Details:", err.code, err.message);
-      console.error("Full Error Object:", err);
+      console.error("CompleteProfile submit error:", err.code || err.message);
       setError('Failed to complete profile. Please try again.');
     } finally {
       setIsSubmitting(false);

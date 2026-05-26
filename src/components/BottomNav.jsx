@@ -1,10 +1,10 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, Search, Heart, MessageCircle, User } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useAuthContext } from '../context/AuthContext';
 
 const BottomNav = () => {
-  const { currentUser } = useAppContext();
+  const { currentUser } = useAuthContext();
 
   if (!currentUser) return null;
 

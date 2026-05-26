@@ -50,5 +50,5 @@ export const calculateMatchPercentage = (user, profile) => {
     if (matched) totalScore += 7;
   }
 
-  return Math.min(100, totalScore);
+  return Math.max(60, Math.min(100, totalScore));
 };

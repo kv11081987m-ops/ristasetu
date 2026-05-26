@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import ProfileCard from '../components/ProfileCard';
 import Button from '../components/Button';
 import { Heart, Send, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { db } from '../firebase/firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 
 const TabButton = ({ name, label, count, activeTab, setActiveTab }) => (
   <button
@@ -26,6 +28,32 @@ const Interests = () => {
   const { profiles, loading, interests, acceptInterest, declineInterest, shortlists } = useAppContext();
   const { currentUser } = useAuthContext();
   const [activeTab, setActiveTab] = useState('received');
+  const [fetchedProfiles, setFetchedProfiles] = useState({});
+
+  // Fetch profiles of interest senders/receivers not in the 200-user snapshot
+  useEffect(() => {
+    if (!currentUser || interests.length === 0) return;
+    const allIds = interests.map(i =>
+      i.senderId === currentUser.uid ? i.receiverId : i.senderId
+    );
+    const missingIds = [...new Set(allIds)].filter(
+      id => id && !profiles.find(p => p.id === id) && !fetchedProfiles[id]
+    );
+    if (missingIds.length === 0) return;
+    Promise.all(
+      missingIds.map(async id => {
+        const snap = await getDoc(doc(db, 'users', id));
+        return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      })
+    ).then(results => {
+      const map = {};
+      results.forEach(p => { if (p) map[p.id] = p; });
+      setFetchedProfiles(prev => ({ ...prev, ...map }));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interests.length, profiles.length]);
+
+  const findProfile = (id) => profiles.find(p => p.id === id) || fetchedProfiles[id];
 
   if (loading) {
     return (
@@ -46,16 +74,16 @@ const Interests = () => {
   const renderContent = () => {
     let list = [];
     if (activeTab === 'received') {
-      list = receivedInterests.map(i => ({ profile: profiles.find(p => p.id === i.senderId), interestId: i.id, type: 'received' }));
+      list = receivedInterests.map(i => ({ profile: findProfile(i.senderId), interestId: i.id, type: 'received' }));
     } else if (activeTab === 'sent') {
-      list = sentInterests.map(i => ({ profile: profiles.find(p => p.id === i.receiverId), interestId: i.id, type: 'sent' }));
+      list = sentInterests.map(i => ({ profile: findProfile(i.receiverId), interestId: i.id, type: 'sent' }));
     } else if (activeTab === 'accepted') {
       list = acceptedInterests.map(i => {
         const otherId = i.senderId === currentUser.uid ? i.receiverId : i.senderId;
-        return { profile: profiles.find(p => p.id === otherId), interestId: i.id, type: 'accepted' };
+        return { profile: findProfile(otherId), interestId: i.id, type: 'accepted' };
       });
     } else if (activeTab === 'shortlisted') {
-      list = myShortlists.map(s => ({ profile: profiles.find(p => p.id === s.profileId), type: 'shortlisted' }));
+      list = myShortlists.map(s => ({ profile: findProfile(s.profileId), type: 'shortlisted' }));
     }
 
     if (list.length === 0) {

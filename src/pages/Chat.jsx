@@ -118,7 +118,7 @@ const Chat = () => {
                   onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/48x48/png?text=U'; }}
                 />
                 <div className="flex-1 overflow-hidden">
-                  <div className="font-bold">{partner?.name}</div>
+                  <div className="font-bold">{partner?.name || 'User'}</div>
                   <div className="text-sm text-light truncate">{chat.lastMessage || 'Chat shuru karein...'}</div>
                 </div>
               </div>
@@ -143,12 +143,12 @@ const Chat = () => {
                 style={{ width: '40px', height: '40px' }}
                 onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/40x40/png?text=U'; }}
               />
-              <div className="font-bold">{otherUser?.name}</div>
+              <div className="font-bold">{otherUser?.name || 'User'}</div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4" style={{ background: '#F9FAFB' }}>
               {messages.length === 0 && (
-                <div className="text-center text-light mt-4 text-sm">{otherUser?.name} ko pehla message bhejein!</div>
+                <div className="text-center text-light mt-4 text-sm">{otherUser?.name || 'User'} ko pehla message bhejein!</div>
               )}
               {messages.map(msg => {
                 const isMe = msg.senderId === currentUser.uid;

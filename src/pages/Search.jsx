@@ -100,7 +100,7 @@ const Search = () => {
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button 
                   variant="outline" 
-                  onClick={() => setFilters({ minAge: 18, maxAge: 50, religion: 'All', maritalStatus: 'All' })}
+                  onClick={() => setFilters({ minAge: 18, maxAge: 50, religion: 'All', caste: '', gotra: '', state: 'All' })}
                 >
                   Clear Filters
                 </Button>

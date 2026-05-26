@@ -56,7 +56,7 @@ const ProfileDetails = () => {
       }
       return <Button variant="outline" className="w-full" disabled>Interest {existingInterest.status.charAt(0).toUpperCase() + existingInterest.status.slice(1)}</Button>;
     }
-    return <Button variant="primary" className="w-full" onClick={() => sendInterest(profile.id, currentUserProfile.uid)}>Send Interest</Button>;
+    return <Button variant="primary" className="w-full" disabled={!currentUserProfile?.uid} onClick={() => currentUserProfile?.uid && sendInterest(profile.id, currentUserProfile.uid)}>Send Interest</Button>;
   };
 
   return (
