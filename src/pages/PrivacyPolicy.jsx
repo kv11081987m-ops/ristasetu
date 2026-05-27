@@ -70,7 +70,7 @@ const PrivacyPolicy = () => {
             <p><strong>Name:</strong> Mukesh Kumar</p>
             <p><strong>Designation:</strong> Grievance Officer</p>
             <p><strong>Organisation:</strong> RistaSetu Matrimony Services</p>
-            <p><strong>Address:</strong> Gorakhpur, Uttar Pradesh – 273001, India</p>
+            <p><strong>Address:</strong> Deoria, Uttar Pradesh – 274001, India</p>
             <p><strong>Email:</strong> grievance@ristasetu.com</p>
             <p><strong>Response Time:</strong> Acknowledgement within 24 hours; resolution within 15 days</p>
           </div>
@@ -78,7 +78,7 @@ const PrivacyPolicy = () => {
 
         <Section title="8. Contact">
           <p>For privacy-related queries or data requests, email us at: <strong>privacy@ristasetu.com</strong></p>
-          <p>Registered entity: RistaSetu Matrimony Services, Gorakhpur, Uttar Pradesh, India.</p>
+          <p>Registered entity: RistaSetu Matrimony Services, Deoria, Uttar Pradesh, India.</p>
         </Section>
       </div>
     </div>

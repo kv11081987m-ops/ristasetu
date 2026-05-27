@@ -87,7 +87,7 @@ const TermsOfService = () => {
         </Section>
 
         <Section title="9. Governing Law & Jurisdiction">
-          <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts of Gorakhpur, Uttar Pradesh.</p>
+          <p>These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of the courts of Deoria, Uttar Pradesh.</p>
         </Section>
 
         <Section title="10. Changes to Terms">
@@ -96,7 +96,7 @@ const TermsOfService = () => {
 
         <Section title="11. Contact">
           <p>For queries regarding these Terms, contact us at: <strong>legal@ristasetu.com</strong></p>
-          <p>RistaSetu Matrimony Services, Gorakhpur, Uttar Pradesh, India.</p>
+          <p>RistaSetu Matrimony Services, Deoria, Uttar Pradesh, India.</p>
         </Section>
       </div>
     </div>
