@@ -20,13 +20,26 @@ export const AppProvider = ({ children }) => {
     const usersQuery = query(
       collection(db, 'users'),
       where('isProfileComplete', '==', true),
-      orderBy('createdAt', 'desc'),
       limit(200)
     );
-    const unsub = onSnapshot(usersQuery, (snapshot) => {
-      setProfiles(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort client-side to avoid composite index requirement
+        docs.sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0);
+          const tb = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0);
+          return tb - ta;
+        });
+        setProfiles(docs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Profiles onSnapshot error:', error.code, error.message);
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [authUser?.uid]);
 

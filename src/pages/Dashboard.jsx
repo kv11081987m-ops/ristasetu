@@ -46,9 +46,6 @@ const Dashboard = () => {
       if (p.id === currentUser.uid) return false;
       if (p.role === 'admin') return false;
 
-      // Removed the filter that hides profiles with existing interests.
-      // Now the ProfileCard will handle showing the appropriate 'Interest Sent' or 'Connected' status.
-
       if (activeFilters.minAge && p.age < parseInt(activeFilters.minAge)) return false;
       if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
       if (activeFilters.city && p.city && !p.city.toLowerCase().includes(activeFilters.city.toLowerCase())) return false;
