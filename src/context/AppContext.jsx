@@ -192,10 +192,12 @@ export const AppProvider = ({ children }) => {
         senderId,
         text,
         timestamp: serverTimestamp(),
+        status: 'sent',
       });
       await updateDoc(doc(db, 'chats', chatId), {
         lastMessage: text,
         lastMessageAt: serverTimestamp(),
+        lastMessageSenderId: senderId,
       });
     } catch (err) {
       console.error('sendMessage error:', err);

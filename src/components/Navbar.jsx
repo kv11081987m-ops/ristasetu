@@ -6,6 +6,22 @@ import { useNotificationContext } from '../context/NotificationContext';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase/firebaseConfig';
 
+const timeAgo = (ts) => {
+  if (!ts) return '';
+  const date = ts?.toDate ? ts.toDate() : new Date(ts);
+  const diff = Date.now() - date.getTime();
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return `${Math.floor(diff / 86400000)}d ago`;
+};
+
+const notifLabel = (type) => {
+  if (type === 'interest') return 'sent you an interest';
+  if (type === 'accepted') return 'accepted your interest';
+  return 'sent you a message';
+};
+
 const Navbar = () => {
   const { currentUser, userProfile } = useAuthContext();
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationContext();
@@ -101,22 +117,31 @@ const Navbar = () => {
                         </div>
                       ) : (
                         notifications.map(notif => (
-                          <div 
+                          <div
                             key={notif.id}
-                            className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${notif.status === 'unread' ? 'bg-red-50/30' : ''}`}
+                            className={`px-3 py-2.5 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer flex gap-2.5 ${notif.status === 'unread' ? 'bg-red-50/30' : ''}`}
                             onClick={() => {
                               markAsRead(notif.id);
-                              if (notif.type === 'message') navigate('/chat');
+                              if (notif.type === 'message' || notif.type === 'accepted') navigate('/chat');
                               if (notif.type === 'interest') navigate('/interests');
                               setIsNotifOpen(false);
                             }}
                           >
-                            <p className="text-sm text-gray-800">
-                              <span className="font-bold">{notif.fromName}</span> {notif.type === 'interest' ? 'sent you an interest' : 'sent you a message'}
-                            </p>
-                            <p className="text-[10px] text-gray-400 mt-1">
-                              {notif.createdAt?.toDate().toLocaleString()}
-                            </p>
+                            <div style={{ width: 36, height: 36, minWidth: 36, borderRadius: '50%', background: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#1A0D3D', fontSize: '0.8rem', overflow: 'hidden', flexShrink: 0 }}>
+                              {notif.fromPhoto
+                                ? <img src={notif.fromPhoto} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none'; }} />
+                                : (notif.fromName || '?').charAt(0).toUpperCase()}
+                            </div>
+                            <div style={{ flex: 1, overflow: 'hidden' }}>
+                              <p className="text-sm text-gray-800 leading-snug">
+                                <span className="font-bold">{notif.fromName}</span>{' '}
+                                {notifLabel(notif.type)}
+                              </p>
+                              {notif.message && (
+                                <p className="text-xs text-gray-500 mt-0.5 truncate">{notif.message}</p>
+                              )}
+                              <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(notif.createdAt)}</p>
+                            </div>
                           </div>
                         ))
                       )}

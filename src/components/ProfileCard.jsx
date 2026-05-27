@@ -6,6 +6,7 @@ import Button from './Button';
 import { useAuthContext } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { useToastContext } from '../context/ToastContext';
+import { useNotificationContext } from '../context/NotificationContext';
 
 import { calculateMatchPercentage } from '../utils/matchUtils';
 import { CheckCircle, Clock } from 'lucide-react';
@@ -14,6 +15,7 @@ const ProfileCard = ({ profile, actionButton }) => {
   const { isProfileComplete, userProfile } = useAuthContext();
   const { sendInterest, interests } = useAppContext();
   const { showToast } = useToastContext();
+  const { sendNotification } = useNotificationContext();
 
   const existingInterest = interests.find(
     i => (i.senderId === userProfile?.uid && i.receiverId === profile.id) || 
@@ -45,6 +47,7 @@ const ProfileCard = ({ profile, actionButton }) => {
       try {
         await sendInterest(profile.id, userProfile.uid);
         setInterestStatus('sent');
+        sendNotification(profile.id, 'interest', userProfile?.name || 'Someone', userProfile?.photoUrl || null, null).catch(() => {});
       } catch (err) {
         setInterestStatus('idle');
         setCountdown(15);

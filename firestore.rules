@@ -114,7 +114,13 @@ service cloud.firestore {
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;
 
-        allow update, delete: if false;
+        // Participants can mark a received message as 'read' (for read receipts)
+        allow update: if isAuth()
+          && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status == 'read';
+
+        allow delete: if false;
       }
     }
 

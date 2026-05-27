@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import { Heart, Send, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { db } from '../firebase/firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
+import { useNotificationContext } from '../context/NotificationContext';
 
 const TabButton = ({ name, label, count, activeTab, setActiveTab }) => (
   <button
@@ -26,7 +27,8 @@ const TabButton = ({ name, label, count, activeTab, setActiveTab }) => (
 const Interests = () => {
   const navigate = useNavigate();
   const { profiles, loading, interests, acceptInterest, declineInterest, shortlists } = useAppContext();
-  const { currentUser } = useAuthContext();
+  const { currentUser, userProfile } = useAuthContext();
+  const { sendNotification } = useNotificationContext();
   const [activeTab, setActiveTab] = useState('received');
   const [fetchedProfiles, setFetchedProfiles] = useState({});
 
@@ -118,7 +120,13 @@ const Interests = () => {
               item.type === 'received' ? (
                 <div className="flex gap-2 w-full">
                   <Button variant="outline" className="flex-1" style={{ padding: '0.5rem' }} onClick={() => declineInterest(item.interestId)}>Decline</Button>
-                  <Button variant="primary" className="flex-1" style={{ padding: '0.5rem' }} onClick={() => acceptInterest(item.interestId)}>Accept</Button>
+                  <Button variant="primary" className="flex-1" style={{ padding: '0.5rem' }} onClick={async () => {
+                    await acceptInterest(item.interestId);
+                    const interest = interests.find(i => i.id === item.interestId);
+                    if (interest) {
+                      sendNotification(interest.senderId, 'accepted', userProfile?.name || 'Someone', userProfile?.photoUrl || null, null).catch(() => {});
+                    }
+                  }}>Accept</Button>
                 </div>
               ) : item.type === 'sent' ? (
                 <Button variant="outline" className="w-full" disabled style={{ padding: '0.5rem' }}>Pending...</Button>

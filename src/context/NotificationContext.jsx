@@ -79,7 +79,7 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  const sendNotification = async (recipientId, type, fromName) => {
+  const sendNotification = async (recipientId, type, fromName, fromPhoto = null, message = null, extraData = {}) => {
     if (!currentUser) return;
     try {
       await addDoc(collection(db, 'notifications'), {
@@ -87,8 +87,11 @@ export const NotificationProvider = ({ children }) => {
         type,
         fromId: currentUser.uid,
         fromName,
+        fromPhoto,
+        message,
         status: 'unread',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        ...extraData
       });
     } catch (error) {
       console.error("Error sending notification:", error);
