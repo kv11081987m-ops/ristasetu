@@ -252,6 +252,12 @@ const Settings = () => {
           />
           <SettingsItem
             icon={ExternalLink}
+            title="Disclaimer"
+            description="Platform ki zimmedari aur kanuni sthiti padhein"
+            to="/disclaimer"
+          />
+          <SettingsItem
+            icon={ExternalLink}
             title="Privacy Policy"
             description="Read how we handle your data"
             to="/about#privacy"

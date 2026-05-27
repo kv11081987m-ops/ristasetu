@@ -22,6 +22,7 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const KYC           = lazy(() => import('./pages/KYC'));
 const AboutPage     = lazy(() => import('./pages/AboutPage'));
+const DisclaimerPage = lazy(() => import('./pages/DisclaimerPage'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -87,6 +88,7 @@ const App = () => {
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/about" element={<AboutPage />} />
+              <Route path="/disclaimer" element={<DisclaimerPage />} />
             </Routes>
           </Suspense>
         </main>

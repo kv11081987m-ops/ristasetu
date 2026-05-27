@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, FileText, Shield, Heart, Users, MapPin, Mail } from 'lucide-react';
+import { ShieldCheck, FileText, Shield, Heart, Users, MapPin, Mail, AlertTriangle } from 'lucide-react';
 
 const Section = ({ title, children }) => (
   <div className="mb-8">
@@ -80,6 +80,30 @@ const AboutPage = () => {
           <a href="#privacy" className="text-red-600 font-bold hover:underline">↓ Privacy Policy padhein</a>
           <span className="text-gray-300">|</span>
           <a href="#terms" className="text-red-600 font-bold hover:underline">↓ Terms of Service padhein</a>
+          <span className="text-gray-300">|</span>
+          <Link to="/disclaimer" className="text-red-600 font-bold hover:underline">⚠ Disclaimer padhein</Link>
+        </div>
+      </div>
+
+      {/* ── Disclaimer ─────────────────────────────────────── */}
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-6">
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={24} className="text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-base font-bold text-red-700 mb-1">Mahatvapurn Disclaimer</h2>
+            <p className="text-sm text-red-800 leading-relaxed">
+              RistaSetu sirf ek madhyam hai — hum OTP se mobile verify karte hain,
+              lekin kisi user ki Aadhar, income, ya background jaanch karna hamare bas mein nahi hai.
+              Rishta tay karne se pehle khud jaankari verify karein, parivaar se milein,
+              aur sirf profile dekhkar koi faisla na lein.
+            </p>
+            <Link
+              to="/disclaimer"
+              className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-red-600 hover:underline"
+            >
+              <AlertTriangle size={14} /> Poora Disclaimer padhein →
+            </Link>
+          </div>
         </div>
       </div>
 
