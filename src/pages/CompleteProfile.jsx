@@ -4,6 +4,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
+import { Link } from 'react-router-dom';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 
 const CompleteProfile = () => {
@@ -238,14 +239,22 @@ const CompleteProfile = () => {
             </div>
           </div>
 
-          <Button 
-            type="submit" 
-            loading={isSubmitting} 
+          <Button
+            type="submit"
+            loading={isSubmitting}
             className="w-full mt-4 py-3 text-lg font-bold shadow-md"
             variant="primary"
           >
             Complete & Go to Dashboard
           </Button>
+
+          <p className="text-center text-xs text-gray-400 mt-3 leading-relaxed">
+            Register karke aap hamare{' '}
+            <Link to="/about#terms" className="text-red-600 hover:underline font-medium">Terms of Service</Link>
+            {' '}aur{' '}
+            <Link to="/about#privacy" className="text-red-600 hover:underline font-medium">Privacy Policy</Link>
+            {' '}se sehmat hain.
+          </p>
         </form>
       </div>
     </div>

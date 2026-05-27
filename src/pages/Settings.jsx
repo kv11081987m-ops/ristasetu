@@ -246,15 +246,21 @@ const Settings = () => {
           />
           <SettingsItem
             icon={ExternalLink}
+            title="Hamare Baare Mein"
+            description="RistaSetu ke mission aur team ke baare mein jaanein"
+            to="/about"
+          />
+          <SettingsItem
+            icon={ExternalLink}
             title="Privacy Policy"
             description="Read how we handle your data"
-            to="/privacy"
+            to="/about#privacy"
           />
           <SettingsItem
             icon={ExternalLink}
             title="Terms of Service"
             description="Rules and conditions for using RistaSetu"
-            to="/terms"
+            to="/about#terms"
           />
         </div>
 
