@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
 import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock, Calendar, Loader2 } from 'lucide-react';
+import PhotoSlider from '../components/PhotoSlider';
 import { formatDate } from '../utils/formatDate';
 
 const ProfileDetails = () => {
@@ -11,6 +12,7 @@ const ProfileDetails = () => {
   const navigate = useNavigate();
   const { profiles, loading, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
   const { currentUser, userProfile: currentUserProfile } = useAuthContext();
+  const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   const profile = profiles.find(p => p.id === id);
 
@@ -48,6 +50,8 @@ const ProfileDetails = () => {
   const isAdmin = currentUserProfile?.role === 'admin';
   const isMatch = existingInterest?.status === 'accepted';
   const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin && !isMatch;
+  const canViewAll = isOwner || isAdmin || isMatch;
+  const photos = profile.photos?.length > 0 ? profile.photos : profile.photoUrl ? [profile.photoUrl] : [];
 
   const renderContactAction = () => {
     if (existingInterest) {
@@ -68,23 +72,36 @@ const ProfileDetails = () => {
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-w-5xl mx-auto">
         <div className="flex flex-col lg:flex-row">
           <div className="lg:w-2/5 relative">
-            <img 
-              src={isPhotoHidden ? 'https://placehold.co/600x800/png?text=Photo+Protected' : (profile.photoUrl || 'https://placehold.co/600x800/png?text=No+Photo')} 
-              alt={profile.name} 
-              className={`w-full h-full min-h-[400px] object-cover transition-all duration-700 ${isPhotoHidden ? 'blur-xl scale-110' : ''}`} 
-              onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/600x800/png?text=No+Photo'; }}
+            <PhotoSlider
+              photos={photos}
+              isFirstVisible={!isPhotoHidden}
+              canViewAll={canViewAll}
+              imgClassName="w-full min-h-[400px] object-cover"
+              currentIndex={activePhotoIdx}
+              onIndexChange={setActivePhotoIdx}
             />
-            {isPhotoHidden && (
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-center p-8">
-                <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl mb-4 border border-white/30">
-                  <Lock size={32} className="text-white" />
-                </div>
-                <h3 className="text-white text-xl font-bold mb-2">Photo Protected</h3>
-                <p className="text-white/80 text-sm">This user has restricted photo visibility. Send an interest to request access.</p>
+            {photos.length > 1 && (
+              <div className="flex gap-2 p-2 overflow-x-auto bg-black/30">
+                {photos.map((url, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setActivePhotoIdx(i)}
+                    className={`flex-shrink-0 w-14 h-14 rounded overflow-hidden border-2 transition-all ${activePhotoIdx === i ? 'border-red-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                  >
+                    {canViewAll || i === 0 ? (
+                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                        <Lock size={14} className="text-white/60" />
+                      </div>
+                    )}
+                  </button>
+                ))}
               </div>
             )}
             {profile.isVerified && (
-              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg border border-white">
+              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg border border-white pointer-events-none">
                 <BadgeCheck size={20} className="text-secondary" />
                 <span className="text-sm font-bold text-secondary">Verified Profile</span>
               </div>

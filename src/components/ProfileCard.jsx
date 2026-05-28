@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Briefcase, BadgeCheck, Send, MessageCircle, Lock } from 'lucide-react';
+import { MapPin, Briefcase, BadgeCheck, Send, MessageCircle } from 'lucide-react';
+import PhotoSlider from './PhotoSlider';
 import VerifiedBadge from './VerifiedBadge';
 import Button from './Button';
 import { useAuthContext } from '../context/AuthContext';
@@ -77,33 +78,23 @@ const ProfileCard = ({ profile, actionButton }) => {
   const matchPercentage = calculateMatchPercentage(userProfile, profile);
   const isOwner = userProfile?.uid === profile.id || userProfile?.uid === profile.uid;
   const isAdmin = userProfile?.role === 'admin';
+  const isMatch = existingInterest?.status === 'accepted';
   const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin;
 
   return (
     <div className="bg-surface rounded-lg shadow-md overflow-hidden border flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
-      <div className="relative overflow-hidden group">
-        <img
-          src={isPhotoHidden ? 'https://placehold.co/300x400/png?text=Photo+Protected' : (profile.photoUrl || 'https://placehold.co/300x400/png?text=No+Photo')}
-          alt={profile.name}
-          loading="lazy"
-          decoding="async"
-          className={`w-full h-64 object-cover transition-all duration-500 ${isPhotoHidden ? 'blur-md scale-110' : ''}`}
-          onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/300x400/png?text=No+Photo'; }}
+      <div className="relative group">
+        <PhotoSlider
+          photos={profile.photos?.length > 0 ? profile.photos : profile.photoUrl ? [profile.photoUrl] : []}
+          isFirstVisible={!isPhotoHidden}
+          canViewAll={isOwner || isAdmin || isMatch}
+          imgClassName="w-full h-64 object-cover"
         />
-        {isPhotoHidden && (
-          <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center p-4">
-            <div className="p-3 bg-white/20 backdrop-blur-md rounded-full mb-2">
-              <Lock size={20} className="text-white" />
-            </div>
-            <p className="text-white text-xs font-bold uppercase tracking-wider">Photo Private</p>
-            <p className="text-white/70 text-[10px] mt-1">Send Interest to view</p>
-          </div>
-        )}
-        <div className="absolute top-3 right-3 bg-red-600/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-red-500">
+        <div className="absolute top-3 right-3 bg-red-600/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-red-500 pointer-events-none">
           <span className="text-xs font-bold text-white">{matchPercentage}% Match</span>
         </div>
         {profile.isVerified && (
-          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm pointer-events-none">
             <BadgeCheck size={16} className="text-secondary" />
             <span className="text-xs font-bold text-secondary">Verified</span>
           </div>

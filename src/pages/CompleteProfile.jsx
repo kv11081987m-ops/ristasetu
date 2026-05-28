@@ -24,8 +24,7 @@ const CompleteProfile = () => {
     about: ''
   });
   
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState('');
+  const [photoItems, setPhotoItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,18 +33,27 @@ const CompleteProfile = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    if (!selected) return;
-    const validationError = validateImageFile(selected);
-    if (validationError) {
-      setError(validationError);
-      e.target.value = '';
-      return;
+  const handleAddPhoto = (e) => {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    const newItems = [];
+    for (const selected of files) {
+      if (photoItems.length + newItems.length >= 5) break;
+      const validationError = validateImageFile(selected);
+      if (validationError) { setError(validationError); return; }
+      newItems.push({ file: selected, preview: URL.createObjectURL(selected) });
     }
-    setError('');
-    setFile(selected);
-    setPreview(URL.createObjectURL(selected));
+    if (newItems.length > 0) {
+      setPhotoItems(prev => [...prev, ...newItems]);
+      setError('');
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    setPhotoItems(prev => {
+      URL.revokeObjectURL(prev[index].preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -70,8 +78,8 @@ const CompleteProfile = () => {
       setError('The "About" section must be at least 20 characters long to help others know you better.');
       return;
     }
-    if (!file) {
-      setError('Please select a profile photo.');
+    if (photoItems.length === 0) {
+      setError('Please add at least one profile photo.');
       return;
     }
 
@@ -79,13 +87,14 @@ const CompleteProfile = () => {
     setError('');
 
     try {
-      // 1. Upload photo to Cloudinary
-      const photoUrl = await uploadToCloudinary(file);
+      // 1. Upload photos to Cloudinary
+      const photoUrls = await Promise.all(photoItems.map(item => uploadToCloudinary(item.file)));
 
       // 2. Save to Firestore
       const profileData = {
         ...formData,
-        photoUrl,
+        photoUrl: photoUrls[0],
+        photos: photoUrls,
         isProfileComplete: true,
         uid: currentUser.uid,
         email: currentUser.email,
@@ -216,27 +225,35 @@ const CompleteProfile = () => {
           </div>
 
           <div className="border-t pt-6">
-            <label className="form-label mb-3 block">Profile Photo</label>
-            
-            <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
-              <label className="cursor-pointer w-full flex flex-col items-center">
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                
-                {preview ? (
-                  <div className="w-40 h-40 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                    <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <span className="text-primary font-medium hover:underline">Click to upload photo</span>
-                    <p className="text-xs text-light mt-1">JPG, PNG ya WebP — max 5MB</p>
-                  </div>
-                )}
-              </label>
+            <label className="form-label mb-3 block">
+              Profile Photos <span className="text-gray-400 font-normal text-xs">({photoItems.length}/5 — pehli photo = main)</span>
+            </label>
+
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+              {photoItems.map((item, i) => (
+                <div key={i} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${i === 0 ? 'border-red-500' : 'border-gray-200'}`}>
+                  <img src={item.preview} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                  {i === 0 && (
+                    <span className="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-[9px] font-bold text-center py-0.5">MAIN</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemovePhoto(i)}
+                    className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {photoItems.length < 5 && (
+                <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-red-300 transition-colors">
+                  <input type="file" accept="image/*" multiple onChange={handleAddPhoto} className="hidden" />
+                  <span className="text-2xl text-gray-400 leading-none">+</span>
+                  <span className="text-[10px] text-gray-400 mt-1">Add Photo</span>
+                </label>
+              )}
             </div>
+            <p className="text-[10px] text-gray-400 mt-2">JPG, PNG ya WebP — max 5MB each</p>
           </div>
 
           <Button
