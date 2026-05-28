@@ -12,10 +12,19 @@ import {
   AlertTriangle,
   X,
   Loader2,
+  Lock,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { auth, db } from '../firebase/firebaseConfig';
-import { signOut, deleteUser } from 'firebase/auth';
-import { doc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import {
+  signOut, deleteUser,
+  EmailAuthProvider, linkWithCredential,
+  reauthenticateWithCredential, updatePassword,
+} from 'firebase/auth';
+import { doc, deleteDoc, getDocs, updateDoc, collection, query, where } from 'firebase/firestore';
 import { useNavigate, Link } from 'react-router-dom';
 
 // eslint-disable-next-line no-unused-vars
@@ -40,6 +49,148 @@ const SettingsItem = ({ icon: ItemIcon, title, description, onClick, to, danger 
     <button onClick={onClick} className="w-full bg-transparent border-none p-0 text-inherit focus:outline-none">
       {content}
     </button>
+  );
+};
+
+// ── Password modal (Set / Change) ────────────────────────────────────────
+const PasswordModal = ({ mode, onClose }) => {
+  const { currentUser, userProfile, setUserProfile } = useAuthContext();
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (newPassword.length < 8) { setError('Minimum 8 characters chahiye.'); return; }
+    setLoading(true);
+    setError('');
+    try {
+      if (mode === 'set') {
+        const email = `${currentUser.uid}@ristasetu.app`;
+        const credential = EmailAuthProvider.credential(email, newPassword);
+        await linkWithCredential(auth.currentUser, credential);
+        await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true, loginEmail: email });
+        setUserProfile(prev => ({ ...prev, hasPassword: true, loginEmail: email }));
+      } else {
+        const oldCred = EmailAuthProvider.credential(userProfile.loginEmail, oldPassword);
+        await reauthenticateWithCredential(auth.currentUser, oldCred);
+        await updatePassword(auth.currentUser, newPassword);
+      }
+      setSuccess(true);
+    } catch (err) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Purana password galat hai.');
+      } else if (err.code === 'auth/requires-recent-login') {
+        setError('Logout karke dobara login karein, phir password change karein.');
+      } else if (err.code === 'auth/provider-already-linked') {
+        setError('Password pehle se set hai.');
+      } else {
+        setError('Kuch galat hua. Dobara try karein.');
+        console.error(err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check size={24} className="text-green-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">
+            {mode === 'set' ? 'Password Set Ho Gaya!' : 'Password Change Ho Gaya!'}
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            {mode === 'set'
+              ? 'Ab aap RistaSetu ID + Password se bhi login kar sakte hain.'
+              : 'Aapka naya password active ho gaya hai.'}
+          </p>
+          <Button variant="primary" className="w-full" onClick={onClose}>Theek Hai</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-xl">
+                <Lock size={20} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">
+                {mode === 'set' ? 'Password Set Karein' : 'Password Change Karein'}
+              </h3>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">{error}</div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            {mode === 'change' && (
+              <div className="form-group">
+                <label className="form-label">Purana Password</label>
+                <div className="relative">
+                  <input
+                    type={showOld ? 'text' : 'password'}
+                    className="form-input w-full pr-10"
+                    placeholder="Purana password dalein"
+                    value={oldPassword}
+                    onChange={e => setOldPassword(e.target.value)}
+                    required
+                  />
+                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer" onClick={() => setShowOld(p => !p)}>
+                    {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="form-group">
+              <label className="form-label">Naya Password</label>
+              <div className="relative">
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  className="form-input w-full pr-10"
+                  placeholder="Minimum 8 characters"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer" onClick={() => setShowNew(p => !p)}>
+                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" type="button" onClick={onClose} disabled={loading}>Cancel</Button>
+              <Button
+                variant="primary"
+                className="flex-1"
+                type="submit"
+                disabled={loading || newPassword.length < 8 || (mode === 'change' && oldPassword.length < 1)}
+              >
+                {loading ? 'Saving...' : mode === 'set' ? 'Set Karo' : 'Change Karo'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -108,6 +259,16 @@ const Settings = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyId = () => {
+    if (!userProfile?.ristaSetuId) return;
+    navigator.clipboard.writeText(userProfile.ristaSetuId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleLogout = async () => {
     if (!window.confirm('Are you sure you want to logout?')) return;
@@ -186,6 +347,12 @@ const Settings = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 page-transition max-w-2xl">
+      {showPasswordModal && (
+        <PasswordModal
+          mode={userProfile?.hasPassword ? 'change' : 'set'}
+          onClose={() => setShowPasswordModal(false)}
+        />
+      )}
       {showDeleteModal && (
         <DeleteAccountModal
           onConfirm={handleDeleteAccount}
@@ -211,6 +378,19 @@ const Settings = () => {
         </div>
         <h3 className="font-bold text-xl text-gray-800">{userProfile?.name}</h3>
         <p className="text-gray-500 text-sm">{userProfile?.phone || userProfile?.email}</p>
+        {userProfile?.ristaSetuId && (
+          <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-gray-400">Aapki RistaSetu ID:</span>
+            <span className="font-mono font-bold text-sm text-gray-800">{userProfile.ristaSetuId}</span>
+            <button
+              onClick={handleCopyId}
+              className="text-gray-400 hover:text-red-600 transition-colors bg-transparent border-none cursor-pointer p-0.5"
+              title="Copy ID"
+            >
+              {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-8">
@@ -222,6 +402,12 @@ const Settings = () => {
             title="Edit Profile"
             description="Update your personal details, age, and location"
             to="/complete-profile"
+          />
+          <SettingsItem
+            icon={Lock}
+            title={userProfile?.hasPassword ? 'Password Change Karo' : 'Password Set Karo'}
+            description={userProfile?.hasPassword ? 'RistaSetu ID login ka password badlein' : 'RS ID se login ke liye password banayein'}
+            onClick={() => setShowPasswordModal(true)}
           />
           <SettingsItem
             icon={Shield}
@@ -241,8 +427,8 @@ const Settings = () => {
           <SettingsItem
             icon={HelpCircle}
             title="Contact Support"
-            description="support@ristasetu.com — Account ya kisi issue ke liye"
-            onClick={() => window.open('mailto:support@ristasetu.com?subject=RistaSetu Support Request', '_blank')}
+            description="ristasetu@gmail.com — Account ya kisi issue ke liye"
+            onClick={() => window.open('mailto:ristasetu@gmail.com?subject=RistaSetu Support Request', '_blank')}
           />
           <SettingsItem
             icon={ExternalLink}

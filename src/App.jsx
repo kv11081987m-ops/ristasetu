@@ -23,6 +23,7 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const KYC           = lazy(() => import('./pages/KYC'));
 const AboutPage     = lazy(() => import('./pages/AboutPage'));
 const DisclaimerPage = lazy(() => import('./pages/DisclaimerPage'));
+const SetupPassword  = lazy(() => import('./pages/SetupPassword'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -73,6 +74,7 @@ const App = () => {
 
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
+              <Route path="/setup-password" element={<ProtectedRoute><SetupPassword /></ProtectedRoute>} />
               <Route path="/complete-profile" element={<ProtectedRoute><CompleteProfile /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />

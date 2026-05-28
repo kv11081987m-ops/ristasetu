@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '../firebase/firebaseConfig';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { generateUniqueRistaSetuId } from '../utils/ristaSetuId';
 
 const AuthContext = createContext();
 
@@ -20,11 +21,17 @@ export const AuthProvider = ({ children }) => {
           const userDoc = await getDoc(userDocRef);
           
           if (userDoc.exists()) {
-            const data = userDoc.data();
+            let data = userDoc.data();
             // If admin has blocked this user, force sign-out immediately
             if (data.isBlocked) {
               await signOut(auth);
               return;
+            }
+            // Auto-assign ristaSetuId for existing users who don't have one
+            if (!data.ristaSetuId) {
+              const newId = await generateUniqueRistaSetuId();
+              await updateDoc(userDocRef, { ristaSetuId: newId });
+              data = { ...data, ristaSetuId: newId };
             }
             setUserProfile(data);
             setIsProfileComplete(data.isProfileComplete || false);

@@ -164,7 +164,7 @@ const ProfileDetails = () => {
               </div>
               <button
                 className="flex items-center gap-2 text-sm text-light bg-transparent border-none cursor-pointer"
-                onClick={() => window.open(`mailto:support@ristasetu.com?subject=Report Profile ${profile.id}&body=I want to report the profile of ${profile.name} (ID: ${profile.id}). Reason: `, '_blank')}
+                onClick={() => window.open(`mailto:ristasetu@gmail.com?subject=Report Profile ${profile.id}&body=I want to report the profile of ${profile.name} (ID: ${profile.id}). Reason: `, '_blank')}
               >
                 <ShieldAlert size={16} /> Report Profile
               </button>

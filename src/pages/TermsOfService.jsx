@@ -95,7 +95,7 @@ const TermsOfService = () => {
         </Section>
 
         <Section title="11. Contact">
-          <p>For queries regarding these Terms, contact us at: <strong>legal@ristasetu.com</strong></p>
+          <p>For queries regarding these Terms, contact us at: <strong>ristasetu@gmail.com</strong></p>
           <p>RistaSetu Matrimony Services, Deoria, Uttar Pradesh, India.</p>
         </Section>
       </div>

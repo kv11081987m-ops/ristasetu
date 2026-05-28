@@ -72,7 +72,7 @@ const AboutPage = () => {
         <Section title="Registered Entity">
           <div className="bg-gray-50 rounded-lg p-4 space-y-1">
             <p className="flex items-center gap-2"><MapPin size={14} className="text-red-500 shrink-0" /> RistaSetu Matrimony Services, Deoria, Uttar Pradesh – 274001, India</p>
-            <p className="flex items-center gap-2"><Mail size={14} className="text-red-500 shrink-0" /> support@ristasetu.com</p>
+            <p className="flex items-center gap-2"><Mail size={14} className="text-red-500 shrink-0" /> ristasetu@gmail.com</p>
           </div>
         </Section>
 
@@ -158,13 +158,13 @@ const AboutPage = () => {
             <p><strong>Designation:</strong> Grievance Officer</p>
             <p><strong>Organisation:</strong> RistaSetu Matrimony Services</p>
             <p><strong>Address:</strong> Deoria, Uttar Pradesh – 274001, India</p>
-            <p><strong>Email:</strong> grievance@ristasetu.com</p>
+            <p><strong>Email:</strong> ristasetu@gmail.com</p>
             <p><strong>Response Time:</strong> Acknowledgement within 24 hours; resolution within 15 days</p>
           </div>
         </Section>
 
         <Section title="8. Contact">
-          <p>For privacy-related queries or data requests, email us at: <strong>privacy@ristasetu.com</strong></p>
+          <p>For privacy-related queries or data requests, email us at: <strong>ristasetu@gmail.com</strong></p>
           <p>Registered entity: RistaSetu Matrimony Services, Deoria, Uttar Pradesh, India.</p>
         </Section>
 
@@ -248,7 +248,7 @@ const AboutPage = () => {
         </Section>
 
         <Section title="11. Contact">
-          <p>For queries regarding these Terms, contact us at: <strong>legal@ristasetu.com</strong></p>
+          <p>For queries regarding these Terms, contact us at: <strong>ristasetu@gmail.com</strong></p>
           <p>RistaSetu Matrimony Services, Deoria, Uttar Pradesh, India.</p>
         </Section>
       </div>
