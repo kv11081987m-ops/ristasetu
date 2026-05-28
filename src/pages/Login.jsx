@@ -4,7 +4,7 @@ import {
   RecaptchaVerifier, signInWithPhoneNumber,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, getDocs, query, collection, where, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
 import { MessageSquare, KeyRound, Eye, EyeOff, Smartphone, BadgeCheck, ArrowLeft } from 'lucide-react';
 
@@ -120,14 +120,6 @@ const Login = () => {
       if (!password)  { setError('Password dalna zaroori hai.'); return; }
       setLoading(true);
       try {
-        const snap = await getDocs(query(collection(db, 'users'), where('ristaSetuId', '==', identifier.toUpperCase())));
-        if (snap.empty) { setError('Yeh RistaSetu ID exist nahi karti.'); return; }
-        const ud = snap.docs[0].data();
-        if (!ud.hasPassword) {
-          setError('Pehle password set karein — OTP se login karein.');
-          return;
-        }
-        // Derive virtual email directly from RS ID — no Firestore lookup needed
         const virtualEmail = `${identifier.toLowerCase()}@ristasetu.app`;
         console.log('[Login] RS ID:', identifier.toUpperCase());
         console.log('[Login] virtualEmail:', virtualEmail);
@@ -135,7 +127,6 @@ const Login = () => {
         const cred = await signInWithEmailAndPassword(auth, virtualEmail, password);
         console.log('[Login] signInWithEmailAndPassword ✓ uid:', cred.user.uid);
 
-        // Force token refresh — Firestore needs updated token after sign-in
         await cred.user.getIdToken(true);
         console.log('[Login] token refreshed ✓, writing session...');
 
@@ -149,9 +140,11 @@ const Login = () => {
         console.log('[Login] session token written ✓');
         navigate('/dashboard');
       } catch (err) {
-        console.error(err);
+        console.error('[Login]', err.code, err.message);
         if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
           setError('Galat ID ya Password. Dobara check karein.');
+        } else if (err.code === 'auth/user-not-found') {
+          setError('Yeh RS ID ka account nahi mila. OTP se login karein aur password set karein.');
         } else if (err.code === 'auth/too-many-requests') {
           setError('Bahut zyada attempts. Kuch der baad try karein.');
         } else if (err.code === 'auth/network-request-failed') {
