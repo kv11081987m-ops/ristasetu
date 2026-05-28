@@ -72,13 +72,14 @@ const PasswordModal = ({ mode, onClose }) => {
     setError('');
     try {
       if (mode === 'set') {
-        const email = `${currentUser.uid}@ristasetu.app`;
-        const credential = EmailAuthProvider.credential(email, newPassword);
+        const virtualEmail = `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
+        const credential = EmailAuthProvider.credential(virtualEmail, newPassword);
         await linkWithCredential(auth.currentUser, credential);
-        await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true, loginEmail: email });
-        setUserProfile(prev => ({ ...prev, hasPassword: true, loginEmail: email }));
+        await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true, virtualEmail, loginEmail: virtualEmail });
+        setUserProfile(prev => ({ ...prev, hasPassword: true, virtualEmail, loginEmail: virtualEmail }));
       } else {
-        const oldCred = EmailAuthProvider.credential(userProfile.loginEmail, oldPassword);
+        const virtualEmail = userProfile.virtualEmail || userProfile.loginEmail || `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
+        const oldCred = EmailAuthProvider.credential(virtualEmail, oldPassword);
         await reauthenticateWithCredential(auth.currentUser, oldCred);
         await updatePassword(auth.currentUser, newPassword);
       }

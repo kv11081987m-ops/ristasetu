@@ -33,14 +33,15 @@ const SetupPassword = () => {
     setLoading(true);
     setError('');
     try {
-      const email = `${currentUser.uid}@ristasetu.app`;
-      const credential = EmailAuthProvider.credential(email, password);
+      const virtualEmail = `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
+      const credential = EmailAuthProvider.credential(virtualEmail, password);
       await linkWithCredential(auth.currentUser, credential);
       await updateDoc(doc(db, 'users', currentUser.uid), {
         hasPassword: true,
-        loginEmail: email,
+        virtualEmail,
+        loginEmail: virtualEmail,
       });
-      setUserProfile(prev => ({ ...prev, hasPassword: true, loginEmail: email }));
+      setUserProfile(prev => ({ ...prev, hasPassword: true, virtualEmail, loginEmail: virtualEmail }));
       goNext();
     } catch (err) {
       console.error('SetupPassword error:', err.code, err.message);

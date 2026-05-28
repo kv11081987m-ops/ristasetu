@@ -123,11 +123,13 @@ const Login = () => {
         const snap = await getDocs(query(collection(db, 'users'), where('ristaSetuId', '==', identifier.toUpperCase())));
         if (snap.empty) { setError('Yeh RistaSetu ID exist nahi karti.'); return; }
         const ud = snap.docs[0].data();
-        if (!ud.hasPassword || !ud.loginEmail) {
-          setError('Aapne password set nahi kiya. Mobile OTP se login karein.');
+        if (!ud.hasPassword) {
+          setError('Pehle password set karein — OTP se login karein.');
           return;
         }
-        const cred = await signInWithEmailAndPassword(auth, ud.loginEmail, password);
+        // Derive virtual email directly from RS ID — no Firestore lookup needed
+        const virtualEmail = `${identifier.toLowerCase()}@ristasetu.app`;
+        const cred = await signInWithEmailAndPassword(auth, virtualEmail, password);
         const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('rsSessionToken', sessionToken);
         await updateDoc(doc(db, 'users', cred.user.uid), {
@@ -139,9 +141,11 @@ const Login = () => {
       } catch (err) {
         console.error(err);
         if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-          setError('Password galat hai.');
+          setError('Galat ID ya Password. Dobara check karein.');
         } else if (err.code === 'auth/too-many-requests') {
           setError('Bahut zyada attempts. Kuch der baad try karein.');
+        } else if (err.code === 'auth/network-request-failed') {
+          setError('Network error — internet check karein.');
         } else {
           setError('Login fail hua. Dobara try karein.');
         }
