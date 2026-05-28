@@ -129,7 +129,16 @@ const Login = () => {
         }
         // Derive virtual email directly from RS ID — no Firestore lookup needed
         const virtualEmail = `${identifier.toLowerCase()}@ristasetu.app`;
+        console.log('[Login] RS ID:', identifier.toUpperCase());
+        console.log('[Login] virtualEmail:', virtualEmail);
+
         const cred = await signInWithEmailAndPassword(auth, virtualEmail, password);
+        console.log('[Login] signInWithEmailAndPassword ✓ uid:', cred.user.uid);
+
+        // Force token refresh — Firestore needs updated token after sign-in
+        await cred.user.getIdToken(true);
+        console.log('[Login] token refreshed ✓, writing session...');
+
         const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('rsSessionToken', sessionToken);
         await updateDoc(doc(db, 'users', cred.user.uid), {
@@ -137,6 +146,7 @@ const Login = () => {
           lastLoginAt: serverTimestamp(),
           lastLoginDevice: getDeviceInfo(),
         });
+        console.log('[Login] session token written ✓');
         navigate('/dashboard');
       } catch (err) {
         console.error(err);

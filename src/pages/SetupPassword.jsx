@@ -34,13 +34,24 @@ const SetupPassword = () => {
     setError('');
     try {
       const virtualEmail = `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
+      console.log('[SetupPassword] uid:', currentUser?.uid);
+      console.log('[SetupPassword] ristaSetuId:', userProfile?.ristaSetuId);
+      console.log('[SetupPassword] virtualEmail:', virtualEmail);
+
       const credential = EmailAuthProvider.credential(virtualEmail, password);
       await linkWithCredential(auth.currentUser, credential);
+      console.log('[SetupPassword] linkWithCredential ✓');
+
+      // Force token refresh — Firestore needs updated token after linking
+      await auth.currentUser.getIdToken(true);
+      console.log('[SetupPassword] token refreshed ✓, writing to Firestore...');
+
       await updateDoc(doc(db, 'users', currentUser.uid), {
         hasPassword: true,
         virtualEmail,
         loginEmail: virtualEmail,
       });
+      console.log('[SetupPassword] updateDoc ✓');
       setUserProfile(prev => ({ ...prev, hasPassword: true, virtualEmail, loginEmail: virtualEmail }));
       goNext();
     } catch (err) {
