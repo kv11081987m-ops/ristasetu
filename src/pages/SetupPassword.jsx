@@ -43,11 +43,21 @@ const SetupPassword = () => {
       setUserProfile(prev => ({ ...prev, hasPassword: true, loginEmail: email }));
       goNext();
     } catch (err) {
+      console.error('SetupPassword error:', err.code, err.message);
       if (err.code === 'auth/provider-already-linked') {
         goNext();
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Password login enable nahi hai. Admin se contact karein: ristasetu@gmail.com');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error — internet check karein aur dobara try karein.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password bahut chhota hai — minimum 8 characters chahiye.');
+      } else if (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use') {
+        setError('Account conflict. Support se contact karein: ristasetu@gmail.com');
+      } else if (err.code === 'auth/requires-recent-login') {
+        setError('Session expire ho gayi. Logout karke dobara OTP se login karein.');
       } else {
-        setError('Password set nahi hua. Dobara try karein.');
-        console.error(err);
+        setError(`Password set nahi hua (${err.code || 'unknown'}). Dobara try karein.`);
       }
     } finally {
       setLoading(false);

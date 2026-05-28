@@ -1,8 +1,9 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import { useAuthContext } from './context/AuthContext';
+import { useToastContext } from './context/ToastContext';
 import AdminRoute from './components/AdminRoute';
 
 // Route-level code splitting — each page loads only when navigated to
@@ -60,12 +61,31 @@ const PublicRoute = ({ children }) => {
 };
 
 
+const SessionWatcher = () => {
+  const { userProfile } = useAuthContext();
+  const { showToast } = useToastContext();
+
+  useEffect(() => {
+    const serverToken = userProfile?.currentSessionToken;
+    if (!serverToken) return;
+    const localToken = localStorage.getItem('rsSessionToken');
+    if (!localToken) return; // Old user without session tracking
+    if (localToken !== serverToken) {
+      showToast('Aapka account kisi aur device ya browser pe login hua hai.', 'info', 6000);
+      localStorage.setItem('rsSessionToken', serverToken);
+    }
+  }, [userProfile?.currentSessionToken, showToast]);
+
+  return null;
+};
+
 const App = () => {
   return (
     <Router>
       <div className="app-layout">
         <Navbar />
         <main className="app-main">
+          <SessionWatcher />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/splash" element={<PublicRoute><Splash /></PublicRoute>} />

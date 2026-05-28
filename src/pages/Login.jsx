@@ -4,7 +4,7 @@ import {
   RecaptchaVerifier, signInWithPhoneNumber,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, getDocs, query, collection, where, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, query, collection, where, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
 import { MessageSquare, KeyRound, Eye, EyeOff, Smartphone, BadgeCheck, ArrowLeft } from 'lucide-react';
 
@@ -117,7 +117,10 @@ const Login = () => {
           setError('Aapne password set nahi kiya. Mobile OTP se login karein.');
           return;
         }
-        await signInWithEmailAndPassword(auth, ud.loginEmail, password);
+        const cred = await signInWithEmailAndPassword(auth, ud.loginEmail, password);
+        const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem('rsSessionToken', sessionToken);
+        await updateDoc(doc(db, 'users', cred.user.uid), { currentSessionToken: sessionToken });
         navigate('/dashboard');
       } catch (err) {
         console.error(err);
@@ -141,11 +144,14 @@ const Login = () => {
       const user = result.user;
       const ref = doc(db, 'users', user.uid);
       const snap = await getDoc(ref);
+      const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem('rsSessionToken', sessionToken);
       let hasPassword = false;
       if (!snap.exists()) {
-        await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false });
+        await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false, currentSessionToken: sessionToken });
       } else {
         hasPassword = snap.data().hasPassword || false;
+        await updateDoc(ref, { currentSessionToken: sessionToken });
       }
       navigate(hasPassword ? '/dashboard' : '/setup-password');
     } catch (err) {

@@ -84,15 +84,23 @@ const PasswordModal = ({ mode, onClose }) => {
       }
       setSuccess(true);
     } catch (err) {
+      console.error('PasswordModal error:', err.code, err.message);
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('Purana password galat hai.');
       } else if (err.code === 'auth/requires-recent-login') {
         setError('Logout karke dobara login karein, phir password change karein.');
       } else if (err.code === 'auth/provider-already-linked') {
         setError('Password pehle se set hai.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Password login enable nahi hai. Admin se contact karein: ristasetu@gmail.com');
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Network error — internet check karein aur dobara try karein.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Password bahut chhota hai — minimum 8 characters chahiye.');
+      } else if (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use') {
+        setError(`Account conflict (${err.code}). Support: ristasetu@gmail.com`);
       } else {
-        setError('Kuch galat hua. Dobara try karein.');
-        console.error(err);
+        setError(`Kuch galat hua (${err.code || 'unknown'}). Dobara try karein.`);
       }
     } finally {
       setLoading(false);
