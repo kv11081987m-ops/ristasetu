@@ -17,7 +17,9 @@ import {
   Check,
   Eye,
   EyeOff,
+  Camera,
 } from 'lucide-react';
+import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import {
   signOut, deleteUser,
@@ -194,6 +196,153 @@ const PasswordModal = ({ mode, onClose }) => {
   );
 };
 
+// ── Photos modal ─────────────────────────────────────────────────────────
+const PhotosModal = ({ onClose }) => {
+  const { currentUser, userProfile, setUserProfile } = useAuthContext();
+  const [photoItems, setPhotoItems] = useState(() => {
+    const existing = userProfile?.photos?.length > 0
+      ? userProfile.photos
+      : userProfile?.photoUrl ? [userProfile.photoUrl] : [];
+    return existing.map(url => ({ type: 'existing', url }));
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleAddPhoto = (e) => {
+    const files = Array.from(e.target.files);
+    e.target.value = '';
+    const newItems = [];
+    for (const selected of files) {
+      if (photoItems.length + newItems.length >= 5) break;
+      const validationError = validateImageFile(selected);
+      if (validationError) { setError(validationError); return; }
+      newItems.push({ type: 'new', file: selected, preview: URL.createObjectURL(selected) });
+    }
+    if (newItems.length > 0) {
+      setPhotoItems(prev => [...prev, ...newItems]);
+      setError('');
+    }
+  };
+
+  const handleRemovePhoto = (index) => {
+    setPhotoItems(prev => {
+      const item = prev[index];
+      if (item.type === 'new') URL.revokeObjectURL(item.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSave = async () => {
+    if (photoItems.length === 0) { setError('Kam se kam ek photo zaroori hai.'); return; }
+    setSaving(true);
+    setError('');
+    try {
+      const photoUrls = await Promise.all(
+        photoItems.map(item =>
+          item.type === 'existing' ? Promise.resolve(item.url) : uploadToCloudinary(item.file)
+        )
+      );
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        photos: photoUrls,
+        photoUrl: photoUrls[0],
+      });
+      setUserProfile(prev => ({ ...prev, photos: photoUrls, photoUrl: photoUrls[0] }));
+      setSuccess(true);
+    } catch (err) {
+      setError('Save karne mein error. Dobara try karein.');
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check size={24} className="text-green-600" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Photos Update Ho Gayi!</h3>
+          <p className="text-sm text-gray-500 mb-4">Aapki profile photos save ho gayi hain.</p>
+          <Button variant="primary" className="w-full" onClick={onClose}>Theek Hai</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-xl">
+                <Camera size={20} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Manage Photos</h3>
+                <p className="text-xs text-gray-400">{photoItems.length}/5 — pehli photo = main</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
+
+          {error && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">{error}</div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 mb-2">
+            {photoItems.map((item, i) => (
+              <div key={i} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${i === 0 ? 'border-red-500' : 'border-gray-200'}`}>
+                <img
+                  src={item.type === 'existing' ? item.url : item.preview}
+                  alt={`Photo ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {i === 0 && (
+                  <span className="absolute bottom-0 left-0 right-0 bg-red-600 text-white text-[9px] font-bold text-center py-0.5">MAIN</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleRemovePhoto(i)}
+                  className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            {photoItems.length < 5 && (
+              <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-red-300 transition-colors">
+                <input type="file" accept="image/*" multiple onChange={handleAddPhoto} className="hidden" />
+                <span className="text-2xl text-gray-400 leading-none">+</span>
+                <span className="text-[10px] text-gray-400 mt-1">Add Photo</span>
+              </label>
+            )}
+          </div>
+
+          <p className="text-[10px] text-gray-400 mb-4">JPG, PNG ya WebP — max 5MB each</p>
+
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              onClick={handleSave}
+              disabled={saving || photoItems.length === 0}
+            >
+              {saving ? 'Saving...' : 'Save Karo'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Delete confirmation modal ─────────────────────────────────────────────
 const DeleteAccountModal = ({ onConfirm, onCancel, isDeleting, error }) => (
   <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
@@ -261,6 +410,7 @@ const Settings = () => {
   const [deleteError, setDeleteError] = useState('');
 
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showPhotosModal, setShowPhotosModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleCopyId = () => {
@@ -353,6 +503,9 @@ const Settings = () => {
           onClose={() => setShowPasswordModal(false)}
         />
       )}
+      {showPhotosModal && (
+        <PhotosModal onClose={() => setShowPhotosModal(false)} />
+      )}
       {showDeleteModal && (
         <DeleteAccountModal
           onConfirm={handleDeleteAccount}
@@ -369,12 +522,23 @@ const Settings = () => {
 
       {/* Profile Overview */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm mb-8 flex flex-col items-center text-center">
-        <div className="w-20 h-20 rounded-full overflow-hidden mb-4 border-2 border-primary/10 p-1">
-          <img
-            src={userProfile?.photoUrl || 'https://placehold.co/80x80/png?text=User'}
-            alt={userProfile?.name}
-            className="w-full h-full object-cover rounded-full"
-          />
+        <div className="relative w-20 h-20 mb-4">
+          <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/10 p-1">
+            <img
+              src={userProfile?.photoUrl || 'https://placehold.co/80x80/png?text=User'}
+              alt={userProfile?.name}
+              className="w-full h-full object-cover rounded-full"
+            />
+          </div>
+          {(userProfile?.photos?.length > 0 || userProfile?.photoUrl) && (
+            <button
+              onClick={() => setShowPhotosModal(true)}
+              className="absolute bottom-0 right-0 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center border-2 border-white cursor-pointer hover:bg-red-700 transition-colors"
+              title="Manage Photos"
+            >
+              <Camera size={11} />
+            </button>
+          )}
         </div>
         <h3 className="font-bold text-xl text-gray-800">{userProfile?.name}</h3>
         <p className="text-gray-500 text-sm">{userProfile?.phone || userProfile?.email}</p>
@@ -402,6 +566,12 @@ const Settings = () => {
             title="Edit Profile"
             description="Update your personal details, age, and location"
             to="/complete-profile"
+          />
+          <SettingsItem
+            icon={Camera}
+            title="Manage Photos"
+            description={`Profile photos edit karein — abhi ${userProfile?.photos?.length || (userProfile?.photoUrl ? 1 : 0)}/5 photos hain`}
+            onClick={() => setShowPhotosModal(true)}
           />
           <SettingsItem
             icon={Lock}
