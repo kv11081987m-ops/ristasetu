@@ -207,7 +207,7 @@ const PhotosModal = ({ onClose }) => {
   });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const handleAddPhoto = (e) => {
     const files = Array.from(e.target.files);
@@ -220,12 +220,14 @@ const PhotosModal = ({ onClose }) => {
       newItems.push({ type: 'new', file: selected, preview: URL.createObjectURL(selected) });
     }
     if (newItems.length > 0) {
+      setSaved(false);
       setPhotoItems(prev => [...prev, ...newItems]);
       setError('');
     }
   };
 
   const handleRemovePhoto = (index) => {
+    setSaved(false);
     setPhotoItems(prev => {
       const item = prev[index];
       if (item.type === 'new') URL.revokeObjectURL(item.preview);
@@ -236,6 +238,7 @@ const PhotosModal = ({ onClose }) => {
   const handleSave = async () => {
     if (photoItems.length === 0) { setError('Kam se kam ek photo zaroori hai.'); return; }
     setSaving(true);
+    setSaved(false);
     setError('');
     try {
       const photoUrls = await Promise.all(
@@ -248,7 +251,9 @@ const PhotosModal = ({ onClose }) => {
         photoUrl: photoUrls[0],
       });
       setUserProfile(prev => ({ ...prev, photos: photoUrls, photoUrl: photoUrls[0] }));
-      setSuccess(true);
+      // Mark all items as existing so further edits detect new changes correctly
+      setPhotoItems(photoUrls.map(url => ({ type: 'existing', url })));
+      setSaved(true);
     } catch (err) {
       setError('Save karne mein error. Dobara try karein.');
       console.error(err);
@@ -256,21 +261,6 @@ const PhotosModal = ({ onClose }) => {
       setSaving(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
-          <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check size={24} className="text-green-600" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">Photos Update Ho Gayi!</h3>
-          <p className="text-sm text-gray-500 mb-4">Aapki profile photos save ho gayi hain.</p>
-          <Button variant="primary" className="w-full" onClick={onClose}>Theek Hai</Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
@@ -330,11 +320,16 @@ const PhotosModal = ({ onClose }) => {
             <Button variant="outline" className="flex-1" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button
               variant="primary"
-              className="flex-1"
+              className="flex-1 transition-all"
+              style={saved ? { backgroundColor: '#16A34A', borderColor: '#16A34A' } : {}}
               onClick={handleSave}
-              disabled={saving || photoItems.length === 0}
+              disabled={saving || saved || photoItems.length === 0}
             >
-              {saving ? 'Saving...' : 'Save Karo'}
+              {saving ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin" />Saving...
+                </span>
+              ) : saved ? 'Saved ✓' : 'Save Karo'}
             </Button>
           </div>
         </div>
