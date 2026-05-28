@@ -208,6 +208,7 @@ const PhotosModal = ({ onClose }) => {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   const handleAddPhoto = (e) => {
     const files = Array.from(e.target.files);
@@ -220,6 +221,7 @@ const PhotosModal = ({ onClose }) => {
       newItems.push({ type: 'new', file: selected, preview: URL.createObjectURL(selected) });
     }
     if (newItems.length > 0) {
+      setIsDirty(true);
       setSaved(false);
       setPhotoItems(prev => [...prev, ...newItems]);
       setError('');
@@ -227,6 +229,7 @@ const PhotosModal = ({ onClose }) => {
   };
 
   const handleRemovePhoto = (index) => {
+    setIsDirty(true);
     setSaved(false);
     setPhotoItems(prev => {
       const item = prev[index];
@@ -253,6 +256,7 @@ const PhotosModal = ({ onClose }) => {
       setUserProfile(prev => ({ ...prev, photos: photoUrls, photoUrl: photoUrls[0] }));
       // Mark all items as existing so further edits detect new changes correctly
       setPhotoItems(photoUrls.map(url => ({ type: 'existing', url })));
+      setIsDirty(false);
       setSaved(true);
     } catch (err) {
       setError('Save karne mein error. Dobara try karein.');
@@ -321,15 +325,15 @@ const PhotosModal = ({ onClose }) => {
             <Button
               variant="primary"
               className="flex-1 transition-all"
-              style={saved ? { backgroundColor: '#16A34A', borderColor: '#16A34A' } : {}}
+              style={(saved && !isDirty) ? { backgroundColor: '#16A34A', borderColor: '#16A34A' } : {}}
               onClick={handleSave}
-              disabled={saving || saved || photoItems.length === 0}
+              disabled={saving || !isDirty || photoItems.length === 0}
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-1.5">
                   <Loader2 size={14} className="animate-spin" />Saving...
                 </span>
-              ) : saved ? 'Saved ✓' : 'Save Karo'}
+              ) : (saved && !isDirty) ? 'Saved ✓' : 'Save Karo'}
             </Button>
           </div>
         </div>
