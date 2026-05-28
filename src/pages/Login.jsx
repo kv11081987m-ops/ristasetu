@@ -21,6 +21,16 @@ const otpErr = (err) => OTP_ERRORS[err.code] || 'Kuch galat hua. Dobara try kare
 
 const RESEND_COUNTDOWN = 60;
 
+const getDeviceInfo = () => {
+  const ua = navigator.userAgent;
+  if (/android/i.test(ua)) return 'Android Device';
+  if (/iphone|ipad/i.test(ua)) return 'iOS Device';
+  if (/windows/i.test(ua)) return 'Windows PC';
+  if (/macintosh|mac os/i.test(ua)) return 'Mac';
+  if (/linux/i.test(ua)) return 'Linux PC';
+  return 'Unknown Device';
+};
+
 const Login = () => {
   const [identifier, setIdentifier]     = useState('');
   const [loginMode, setLoginMode]       = useState('otp'); // 'otp' | 'password'
@@ -120,7 +130,11 @@ const Login = () => {
         const cred = await signInWithEmailAndPassword(auth, ud.loginEmail, password);
         const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('rsSessionToken', sessionToken);
-        await updateDoc(doc(db, 'users', cred.user.uid), { currentSessionToken: sessionToken });
+        await updateDoc(doc(db, 'users', cred.user.uid), {
+          currentSessionToken: sessionToken,
+          lastLoginAt: serverTimestamp(),
+          lastLoginDevice: getDeviceInfo(),
+        });
         navigate('/dashboard');
       } catch (err) {
         console.error(err);
@@ -147,11 +161,12 @@ const Login = () => {
       const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
       localStorage.setItem('rsSessionToken', sessionToken);
       let hasPassword = false;
+      const loginMeta = { currentSessionToken: sessionToken, lastLoginAt: serverTimestamp(), lastLoginDevice: getDeviceInfo() };
       if (!snap.exists()) {
-        await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false, currentSessionToken: sessionToken });
+        await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false, ...loginMeta });
       } else {
         hasPassword = snap.data().hasPassword || false;
-        await updateDoc(ref, { currentSessionToken: sessionToken });
+        await updateDoc(ref, loginMeta);
       }
       navigate(hasPassword ? '/dashboard' : '/setup-password');
     } catch (err) {

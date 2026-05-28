@@ -71,7 +71,7 @@ const SessionWatcher = () => {
     const localToken = localStorage.getItem('rsSessionToken');
     if (!localToken) return; // Old user without session tracking
     if (localToken !== serverToken) {
-      showToast('Aapka account kisi aur device ya browser pe login hua hai.', 'info', 6000);
+      showToast('Aapka account kisi naye device pe login hua hai. Aap nahi the to password change karein.', 'info', 8000);
       localStorage.setItem('rsSessionToken', serverToken);
     }
   }, [userProfile?.currentSessionToken, showToast]);
