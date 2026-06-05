@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   RecaptchaVerifier, signInWithPhoneNumber,
-  signInWithEmailAndPassword,
+  signInWithEmailAndPassword, signOut,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { hashPassword } from '../utils/cryptoUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import { MessageSquare, KeyRound, Eye, EyeOff, Smartphone, BadgeCheck, ArrowLeft } from 'lucide-react';
 
@@ -120,16 +121,40 @@ const Login = () => {
       if (!password)  { setError('Password dalna zaroori hai.'); return; }
       setLoading(true);
       try {
-        const virtualEmail = `${identifier.toLowerCase()}@ristasetu.app`;
-        console.log('[Login] RS ID:', identifier.toUpperCase());
-        console.log('[Login] virtualEmail:', virtualEmail);
+        const rsId = identifier.toUpperCase();
+        const pwHash = await hashPassword(password);
 
-        const cred = await signInWithEmailAndPassword(auth, virtualEmail, password);
-        console.log('[Login] signInWithEmailAndPassword ✓ uid:', cred.user.uid);
+        // Step 1: RS ID lookup in public password_index (no auth needed)
+        const indexSnap = await getDoc(doc(db, 'password_index', rsId));
+        if (!indexSnap.exists()) {
+          setError('Yeh RS ID nahi mili. OTP se login karein aur Settings mein password set karein.');
+          return;
+        }
+        const { uid: expectedUid, hasPassword: hasPw, passwordHash: storedHash } = indexSnap.data();
+        if (!hasPw) {
+          setError('Password set nahi hai. OTP se login karein aur Settings mein password set karein.');
+          return;
+        }
 
+        // Step 2: Verify hash locally before making Firebase Auth call
+        if (pwHash !== storedHash) {
+          setError('Galat password. Dobara check karein.');
+          return;
+        }
+
+        // Step 3: Firebase Auth signin with hash as password
+        const virtualEmail = `${rsId.toLowerCase()}@ristasetu.app`;
+        const cred = await signInWithEmailAndPassword(auth, virtualEmail, pwHash);
+
+        // Step 4: Verify UID matches expected (catches broken/duplicate accounts)
+        if (cred.user.uid !== expectedUid) {
+          await signOut(auth);
+          setError('Account mismatch detected. OTP se login karein aur password reset karein.');
+          return;
+        }
+
+        // Step 5: Write session token
         await cred.user.getIdToken(true);
-        console.log('[Login] token refreshed ✓, writing session...');
-
         const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('rsSessionToken', sessionToken);
         await updateDoc(doc(db, 'users', cred.user.uid), {
@@ -137,14 +162,13 @@ const Login = () => {
           lastLoginAt: serverTimestamp(),
           lastLoginDevice: getDeviceInfo(),
         });
-        console.log('[Login] session token written ✓');
         navigate('/dashboard');
       } catch (err) {
         console.error('[Login]', err.code, err.message);
-        if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-          setError('Galat ID ya Password. Dobara check karein.');
-        } else if (err.code === 'auth/user-not-found') {
-          setError('Yeh RS ID ka account nahi mila. OTP se login karein aur password set karein.');
+        if (err.code === 'auth/user-not-found') {
+          setError('Firebase account nahi mila. OTP se login karein aur password reset karein.');
+        } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          setError('Login fail hua. OTP se login karein aur password reset karein.');
         } else if (err.code === 'auth/too-many-requests') {
           setError('Bahut zyada attempts. Kuch der baad try karein.');
         } else if (err.code === 'auth/network-request-failed') {

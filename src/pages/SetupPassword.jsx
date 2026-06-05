@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { EmailAuthProvider, linkWithCredential } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebaseConfig';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
 import { Key, Eye, EyeOff } from 'lucide-react';
+import { hashPassword } from '../utils/cryptoUtils';
 
 const SetupPassword = () => {
   const { currentUser, userProfile, setUserProfile } = useAuthContext();
@@ -33,31 +34,33 @@ const SetupPassword = () => {
     setLoading(true);
     setError('');
     try {
-      const virtualEmail = `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
-      console.log('[SetupPassword] uid:', currentUser?.uid);
-      console.log('[SetupPassword] ristaSetuId:', userProfile?.ristaSetuId);
-      console.log('[SetupPassword] virtualEmail:', virtualEmail);
+      const rsId = userProfile.ristaSetuId.toUpperCase();
+      const virtualEmail = `${rsId.toLowerCase()}@ristasetu.app`;
+      const pwHash = await hashPassword(password);
 
-      const credential = EmailAuthProvider.credential(virtualEmail, password);
+      const credential = EmailAuthProvider.credential(virtualEmail, pwHash);
       await linkWithCredential(auth.currentUser, credential);
-      console.log('[SetupPassword] linkWithCredential ✓');
-
-      // Force token refresh — Firestore needs updated token after linking
       await auth.currentUser.getIdToken(true);
-      console.log('[SetupPassword] token refreshed ✓, writing to Firestore...');
 
-      await updateDoc(doc(db, 'users', currentUser.uid), {
-        hasPassword: true,
-        virtualEmail,
-        loginEmail: virtualEmail,
-      });
-      console.log('[SetupPassword] updateDoc ✓');
-      setUserProfile(prev => ({ ...prev, hasPassword: true, virtualEmail, loginEmail: virtualEmail }));
+      await Promise.all([
+        updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true }),
+        setDoc(doc(db, 'password_index', rsId), {
+          uid: currentUser.uid,
+          hasPassword: true,
+          passwordHash: pwHash,
+        }),
+      ]);
+      setUserProfile(prev => ({ ...prev, hasPassword: true }));
       goNext();
     } catch (err) {
       console.error('SetupPassword error:', err.code, err.message);
       if (err.code === 'auth/provider-already-linked') {
-        goNext();
+        // Email/password already linked — may be a retry. Update hasPassword in Firestore.
+        try {
+          await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true });
+          setUserProfile(prev => ({ ...prev, hasPassword: true }));
+        } catch (_) { /* ignore */ }
+        setError('Password pehle se set tha. Settings mein "Password Change Karo" use karein.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Password login enable nahi hai. Admin se contact karein: ristasetu@gmail.com');
       } else if (err.code === 'auth/network-request-failed') {

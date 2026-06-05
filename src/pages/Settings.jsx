@@ -26,7 +26,8 @@ import {
   EmailAuthProvider, linkWithCredential,
   reauthenticateWithCredential, updatePassword,
 } from 'firebase/auth';
-import { doc, deleteDoc, getDocs, updateDoc, collection, query, where } from 'firebase/firestore';
+import { doc, deleteDoc, getDocs, updateDoc, setDoc, collection, query, where } from 'firebase/firestore';
+import { hashPassword } from '../utils/cryptoUtils';
 import { useNavigate, Link } from 'react-router-dom';
 
 // eslint-disable-next-line no-unused-vars
@@ -71,17 +72,45 @@ const PasswordModal = ({ mode, onClose }) => {
     setLoading(true);
     setError('');
     try {
+      const rsId = userProfile.ristaSetuId.toUpperCase();
+      const virtualEmail = `${rsId.toLowerCase()}@ristasetu.app`;
+
       if (mode === 'set') {
-        const virtualEmail = `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
-        const credential = EmailAuthProvider.credential(virtualEmail, newPassword);
+        const pwHash = await hashPassword(newPassword);
+        const credential = EmailAuthProvider.credential(virtualEmail, pwHash);
         await linkWithCredential(auth.currentUser, credential);
-        await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true, virtualEmail, loginEmail: virtualEmail });
-        setUserProfile(prev => ({ ...prev, hasPassword: true, virtualEmail, loginEmail: virtualEmail }));
+        await auth.currentUser.getIdToken(true);
+        await Promise.all([
+          updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true }),
+          setDoc(doc(db, 'password_index', rsId), {
+            uid: currentUser.uid,
+            hasPassword: true,
+            passwordHash: pwHash,
+          }),
+        ]);
+        setUserProfile(prev => ({ ...prev, hasPassword: true }));
       } else {
-        const virtualEmail = userProfile.virtualEmail || userProfile.loginEmail || `${userProfile.ristaSetuId.toLowerCase()}@ristasetu.app`;
-        const oldCred = EmailAuthProvider.credential(virtualEmail, oldPassword);
-        await reauthenticateWithCredential(auth.currentUser, oldCred);
-        await updatePassword(auth.currentUser, newPassword);
+        // 'change' mode — try SHA256 first, fallback to plaintext for migration
+        const oldHash = await hashPassword(oldPassword);
+        const newHash = await hashPassword(newPassword);
+
+        try {
+          await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldHash));
+        } catch (firstErr) {
+          if (firstErr.code === 'auth/wrong-password' || firstErr.code === 'auth/invalid-credential') {
+            // Migration fallback: user may have set password before SHA256 approach
+            await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldPassword));
+          } else {
+            throw firstErr;
+          }
+        }
+
+        await updatePassword(auth.currentUser, newHash);
+        await setDoc(doc(db, 'password_index', rsId), {
+          uid: currentUser.uid,
+          hasPassword: true,
+          passwordHash: newHash,
+        });
       }
       setSuccess(true);
     } catch (err) {
@@ -91,7 +120,7 @@ const PasswordModal = ({ mode, onClose }) => {
       } else if (err.code === 'auth/requires-recent-login') {
         setError('Logout karke dobara login karein, phir password change karein.');
       } else if (err.code === 'auth/provider-already-linked') {
-        setError('Password pehle se set hai.');
+        setError('Password pehle se set hai. "Password Change Karo" option use karein.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Password login enable nahi hai. Admin se contact karein: ristasetu@gmail.com');
       } else if (err.code === 'auth/network-request-failed') {

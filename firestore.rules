@@ -124,6 +124,16 @@ service cloud.firestore {
       }
     }
 
+    // ── password_index ────────────────────────────────────────────────────
+    // Public read (needed for unauthenticated RS ID + password login lookup).
+    // Only the uid owner can write their own entry.
+    match /password_index/{rsId} {
+      allow read: if true;
+      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuth() && resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
     // ── notifications ─────────────────────────────────────────────────────
     // Each user can only read their own notifications.
     // Any authenticated user can create a notification for another user.
