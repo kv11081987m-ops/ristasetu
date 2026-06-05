@@ -1,24 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import Button from '../components/Button';
 import {
-  LogOut,
-  User,
-  ChevronRight,
-  Shield,
-  Trash2,
-  HelpCircle,
-  ExternalLink,
-  AlertTriangle,
-  X,
-  Loader2,
-  Lock,
-  Copy,
-  Check,
-  Eye,
-  EyeOff,
-  Camera,
-  FileText,
+  LogOut, User, ChevronRight, Shield, Trash2, HelpCircle, ExternalLink,
+  AlertTriangle, X, Loader2, Lock, Copy, Check, Eye, EyeOff, Camera,
+  FileText, Users, UserPlus, Trash,
 } from 'lucide-react';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
@@ -28,9 +14,201 @@ import {
   EmailAuthProvider, linkWithCredential,
   reauthenticateWithCredential, updatePassword,
 } from 'firebase/auth';
-import { doc, deleteDoc, getDocs, updateDoc, setDoc, collection, query, where } from 'firebase/firestore';
+import {
+  doc, deleteDoc, getDocs, updateDoc, setDoc, addDoc,
+  collection, query, where, onSnapshot, serverTimestamp,
+} from 'firebase/firestore';
 import { hashPassword } from '../utils/cryptoUtils';
 import { useNavigate, Link } from 'react-router-dom';
+
+// ── Family Access Modal ───────────────────────────────────────────────────────
+const FamilyAccessModal = ({ onClose, currentUser }) => {
+  const RELATIONS = ['Father/Pita', 'Mother/Mata', 'Brother/Bhai', 'Sister/Bahen', 'Uncle/Chacha', 'Aunt/Chachi', 'Other'];
+  const [name, setName] = useState('');
+  const [relation, setRelation] = useState(RELATIONS[0]);
+  const [phone, setPhone] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length !== 10) { setError('10 digit mobile number chahiye.'); return; }
+    if (!name.trim()) { setError('Naam dalna zaroori hai.'); return; }
+    setLoading(true); setError('');
+    try {
+      const normalizedPhone = `+91${digits}`;
+      await setDoc(doc(db, 'family_access', normalizedPhone), {
+        phone: normalizedPhone,
+        linkedUserId: currentUser.uid,
+        name: name.trim(),
+        relation,
+        status: 'active',
+        addedAt: serverTimestamp(),
+      });
+      setSuccess(true);
+    } catch (err) {
+      setError('Add karne mein error hua. Dobara try karein.');
+      console.error(err);
+    } finally { setLoading(false); }
+  };
+
+  if (success) return (
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 text-center">
+        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Check size={24} className="text-green-600" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 mb-2">Family Member Add Ho Gaya!</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Ab woh apne phone se OTP login karke aapka profile dekh sakenge.
+        </p>
+        <Button variant="primary" className="w-full" onClick={onClose}>Theek Hai</Button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-50 rounded-xl"><UserPlus size={20} className="text-red-600" /></div>
+              <h3 className="text-lg font-bold text-gray-900">Family Member Add Karein</h3>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer"><X size={20} /></button>
+          </div>
+          {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 mb-4">{error}</div>}
+          <form onSubmit={handleAdd} className="flex flex-col gap-4">
+            <div className="form-group">
+              <label className="form-label">Naam</label>
+              <input type="text" className="form-input w-full" placeholder="e.g. Ramesh ji" value={name} onChange={e => setName(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Rishta / Relation</label>
+              <select className="form-input w-full" value={relation} onChange={e => setRelation(e.target.value)}>
+                {RELATIONS.map(r => <option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Mobile Number</label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-gray-500 shrink-0">+91</span>
+                <input
+                  type="tel" className="form-input flex-1" placeholder="9XXXXXXXXX"
+                  value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  required
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Isi number se woh OTP login karenge</p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" type="button" onClick={onClose} disabled={loading}>Cancel</Button>
+              <Button variant="primary" className="flex-1" type="submit" disabled={loading || !name || phone.replace(/\D/g,'').length !== 10}>
+                {loading ? 'Adding...' : 'Add Karein'}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Family Members List ───────────────────────────────────────────────────────
+const FamilySection = ({ currentUser }) => {
+  const [members, setMembers] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    return onSnapshot(
+      query(collection(db, 'family_access'), where('linkedUserId', '==', currentUser.uid)),
+      (snap) => setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    );
+  }, [currentUser?.uid]);
+
+  const toggleStatus = async (member) => {
+    const newStatus = member.status === 'active' ? 'inactive' : 'active';
+    await updateDoc(doc(db, 'family_access', member.id), { status: newStatus });
+  };
+
+  const removeMember = async (member) => {
+    if (!window.confirm(`${member.name} ko remove karein?`)) return;
+    await deleteDoc(doc(db, 'family_access', member.id));
+  };
+
+  return (
+    <div>
+      {showAddModal && <FamilyAccessModal onClose={() => setShowAddModal(false)} currentUser={currentUser} />}
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 px-2">Family Access</h4>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors cursor-pointer border-none"
+        >
+          <UserPlus size={13} /> Add Family
+        </button>
+      </div>
+
+      {members.length === 0 ? (
+        <div
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center justify-between p-4 bg-white rounded-xl border border-dashed border-gray-300 hover:border-red-300 hover:bg-red-50/30 transition-all cursor-pointer mb-3"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-2 rounded-lg bg-gray-50 text-gray-400"><Users size={20} /></div>
+            <div>
+              <p className="font-bold text-sm text-gray-600">Family Access Den</p>
+              <p className="text-xs text-gray-400">Pita, Mata ya koi family member ko invite karein</p>
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-gray-300" />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2 mb-3">
+          {members.map(member => (
+            <div key={member.id} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Users size={16} className="text-red-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-gray-800 truncate">{member.name}</p>
+                <p className="text-xs text-gray-400">{member.relation} · {member.phone}</p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => toggleStatus(member)}
+                  className={`text-xs px-2 py-1 rounded-full font-semibold border-none cursor-pointer transition-colors ${
+                    member.status === 'active'
+                      ? 'bg-green-100 text-green-700 hover:bg-yellow-100 hover:text-yellow-700'
+                      : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-700'
+                  }`}
+                >
+                  {member.status === 'active' ? 'Active' : 'Inactive'}
+                </button>
+                <button
+                  onClick={() => removeMember(member)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  <Trash size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center justify-center gap-2 p-3 rounded-xl border border-dashed border-gray-300 text-sm text-gray-500 hover:border-red-300 hover:text-red-600 hover:bg-red-50/30 transition-all cursor-pointer bg-transparent w-full"
+          >
+            <UserPlus size={15} /> Aur family member add karein
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // eslint-disable-next-line no-unused-vars
 const SettingsItem = ({ icon: ItemIcon, title, description, onClick, to, danger = false }) => {
@@ -645,6 +823,11 @@ const Settings = () => {
             }
             to="/kyc"
           />
+        </div>
+
+        {/* Family Access Section */}
+        <div>
+          <FamilySection currentUser={currentUser} />
         </div>
 
         {/* Support Section */}

@@ -25,6 +25,7 @@ const KYC           = lazy(() => import('./pages/KYC'));
 const AboutPage     = lazy(() => import('./pages/AboutPage'));
 const DisclaimerPage = lazy(() => import('./pages/DisclaimerPage'));
 const SetupPassword  = lazy(() => import('./pages/SetupPassword'));
+const FamilyDashboard = lazy(() => import('./pages/FamilyDashboard'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -33,30 +34,33 @@ const PageLoader = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-  const { currentUser, isProfileComplete } = useAuthContext();
+  const { currentUser, isProfileComplete, familyMode } = useAuthContext();
   const location = useLocation();
-  
-  if (!currentUser) return <Navigate to="/splash" replace />;
-  
-  // Removed strict force redirect to allow users to preview the Dashboard
-  // as per requirement #4, where incomplete profiles can view the dashboard but buttons are disabled.
-  
-  // They are redirected properly post-login by PublicRoute.
 
-  // If they have a completed profile but try to hit the complete-profile page again, direct to dashboard
+  if (!currentUser) return <Navigate to="/splash" replace />;
+  // Family accounts should stay in their own dashboard
+  if (familyMode) return <Navigate to="/family-dashboard" replace />;
   if (currentUser && isProfileComplete && location.pathname === '/complete-profile') {
     return <Navigate to="/dashboard" replace />;
   }
-
   return children;
 };
 
 const PublicRoute = ({ children }) => {
-  const { currentUser, isProfileComplete } = useAuthContext();
-  
+  const { currentUser, isProfileComplete, familyMode } = useAuthContext();
+
   if (currentUser) {
+    if (familyMode) return <Navigate to="/family-dashboard" replace />;
     return isProfileComplete ? <Navigate to="/dashboard" replace /> : <Navigate to="/complete-profile" replace />;
   }
+  return children;
+};
+
+// Only family accounts can access this route
+const FamilyRoute = ({ children }) => {
+  const { currentUser, familyMode } = useAuthContext();
+  if (!currentUser) return <Navigate to="/splash" replace />;
+  if (!familyMode) return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -105,6 +109,8 @@ const App = () => {
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/kyc" element={<ProtectedRoute><KYC /></ProtectedRoute>} />
               <Route path="/premium" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
+
+              <Route path="/family-dashboard" element={<FamilyRoute><FamilyDashboard /></FamilyRoute>} />
 
               <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
               <Route path="/privacy" element={<PrivacyPolicy />} />

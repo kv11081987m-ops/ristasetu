@@ -4,7 +4,7 @@ import {
   RecaptchaVerifier, signInWithPhoneNumber,
   signInWithEmailAndPassword, signOut,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { hashPassword } from '../utils/cryptoUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import { MessageSquare, KeyRound, Eye, EyeOff, Smartphone, BadgeCheck, ArrowLeft } from 'lucide-react';
@@ -191,8 +191,38 @@ const Login = () => {
       const snap = await getDoc(ref);
       const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
       localStorage.setItem('rsSessionToken', sessionToken);
-      let hasPassword = false;
       const loginMeta = { currentSessionToken: sessionToken, lastLoginAt: serverTimestamp(), lastLoginDevice: getDeviceInfo() };
+
+      // Family member check: only if they don't have their own complete profile
+      const hasOwnProfile = snap.exists() && snap.data().isProfileComplete;
+      if (!hasOwnProfile && user.phoneNumber) {
+        try {
+          const famSnap = await getDoc(doc(db, 'family_access', user.phoneNumber));
+          if (famSnap.exists() && famSnap.data().status === 'active') {
+            const fd = famSnap.data();
+            // Create/update their minimal Firestore doc
+            if (!snap.exists()) {
+              await setDoc(ref, { phone: user.phoneNumber, isFamilyAccount: true, isProfileComplete: false, createdAt: serverTimestamp(), ...loginMeta });
+            } else {
+              await updateDoc(ref, { ...loginMeta, isFamilyAccount: true });
+            }
+            // Notify linked user
+            await addDoc(collection(db, 'notifications'), {
+              userId: fd.linkedUserId,
+              fromId: user.uid,
+              type: 'family_login',
+              message: `${fd.name} (${fd.relation}) ne aapki profile dekhi`,
+              status: 'unread',
+              createdAt: serverTimestamp(),
+            });
+            navigate('/family-dashboard');
+            return;
+          }
+        } catch { /* non-family user, continue normal flow */ }
+      }
+
+      // Regular user flow
+      let hasPassword = false;
       if (!snap.exists()) {
         await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false, ...loginMeta });
       } else {
