@@ -1,132 +1,236 @@
-import React from 'react';
-import { useAuthContext } from '../context/AuthContext';
-import Button from '../components/Button';
-import { Check, Star, Crown, Zap, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuthContext } from '../context/AuthContext';
+import { Check, Gem, Zap, ArrowLeft } from 'lucide-react';
 
-// eslint-disable-next-line no-unused-vars
-const PlanCard = ({ title, price, duration, features, icon: Icon, color, popular, isCurrent }) => (
-  <div className={`relative bg-white rounded-2xl shadow-xl border-2 transition-all duration-300 hover:-translate-y-2 flex flex-col ${popular ? 'border-red-600 scale-105 z-10' : 'border-gray-100 hover:border-red-200'}`}>
-    {popular && (
-      <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-md">
-        Most Popular
+const MAROON = '#8B1A2F';
+const GOLD   = '#D4AF37';
+
+const PLANS = [
+  {
+    key: 'bronze',
+    emoji: '🥉',
+    name: 'Bronze',
+    price: 299,
+    duration: '3 Months',
+    color: '#CD7F32',
+    bg: '#FDF4EC',
+    border: '#E8C5A0',
+    features: [
+      'Kisne Dekha — Profile viewers',
+      'Verified ✅ Badge milega',
+      '3 Photos upload kar sakte hain',
+      '10 Interests/day',
+    ],
+  },
+  {
+    key: 'silver',
+    emoji: '🥈',
+    name: 'Silver',
+    price: 499,
+    duration: '6 Months',
+    color: '#888',
+    bg: '#F8F9FF',
+    border: MAROON,
+    popular: true,
+    features: [
+      'Sab Bronze features',
+      'Profile Boost — weekly 1 baar',
+      'Unlimited Interests bhejo',
+      '5 Photos upload kar sakte hain',
+    ],
+  },
+  {
+    key: 'gold',
+    emoji: '🥇',
+    name: 'Gold',
+    price: 799,
+    duration: '1 Year',
+    color: GOLD,
+    bg: '#FFFBEC',
+    border: GOLD,
+    features: [
+      'Sab Silver features',
+      'Profile Boost — daily',
+      'Priority customer support',
+      'Biodata PDF — unlimited',
+      'Top of search results mein',
+    ],
+  },
+];
+
+const ComingSoonModal = ({ plan, onClose }) => (
+  <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div style={{ background: `linear-gradient(135deg, ${MAROON}, #5C0E1E)` }} className="p-6 text-center">
+        <div className="text-4xl mb-2">{plan.emoji}</div>
+        <h3 className="text-xl font-black text-white">{plan.name} Plan</h3>
+        <p className="text-white/70 text-sm mt-1">₹{plan.price} / {plan.duration}</p>
       </div>
-    )}
-    
-    <div className="p-8 text-center flex flex-col items-center">
-      <div className={`p-4 rounded-2xl mb-6 ${color}`}>
-        <Icon size={32} className="text-white" />
+      <div className="p-6 text-center">
+        <div className="text-5xl mb-3">🎉</div>
+        <h4 className="text-xl font-black text-gray-900 mb-2">Coming Soon!</h4>
+        <p className="text-gray-500 text-sm leading-relaxed mb-6">
+          Hum payment gateway integrate kar rahe hain.<br />
+          <strong>Jald aayega!</strong> Tab tak app enjoy karein aur apni profile complete karein.
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full py-3 font-bold rounded-xl text-white text-base border-none cursor-pointer"
+          style={{ background: `linear-gradient(135deg, ${MAROON}, #C0392B)` }}
+        >
+          Theek Hai, Samjha!
+        </button>
       </div>
-      <h3 className="text-xl font-bold text-gray-800 mb-2">{title}</h3>
-      <div className="flex items-baseline justify-center gap-1 mb-6">
-        <span className="text-4xl font-extrabold text-gray-900">₹{price}</span>
-        <span className="text-gray-500 font-medium">/{duration}</span>
-      </div>
-      
-      <div className="w-full space-y-4 mb-8">
-        {features.map((feature, idx) => (
-          <div key={idx} className="flex items-center gap-3 text-left">
-            <div className="flex-shrink-0 w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
-              <Check size={12} className="text-green-600 font-bold" />
-            </div>
-            <span className="text-sm text-gray-600">{feature}</span>
-          </div>
-        ))}
-      </div>
-      
-      <Button 
-        variant={popular ? 'primary' : 'outline'} 
-        className={`w-full py-3 rounded-xl font-bold ${isCurrent ? 'bg-green-50 text-green-600 border-green-200 cursor-default hover:bg-green-50' : ''}`}
-        disabled={isCurrent}
-      >
-        {isCurrent ? 'Current Plan' : 'Get Started'}
-      </Button>
     </div>
   </div>
 );
 
+const PlanCard = ({ plan, isCurrent, onUpgrade }) => {
+  const { popular } = plan;
+  return (
+    <div
+      className={`relative bg-white rounded-2xl flex flex-col overflow-visible transition-all duration-300 hover:-translate-y-1 ${popular ? 'scale-[1.03] z-10' : ''}`}
+      style={{ border: `2px solid ${popular ? MAROON : plan.border}`, boxShadow: popular ? `0 8px 30px rgba(139,26,47,0.18)` : '0 2px 12px rgba(0,0,0,0.06)' }}
+    >
+      {popular && (
+        <div className="absolute -top-4 left-0 right-0 flex justify-center">
+          <span
+            className="px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest text-white shadow-md"
+            style={{ background: `linear-gradient(90deg, ${MAROON}, #C0392B)` }}
+          >
+            ⭐ Most Popular
+          </span>
+        </div>
+      )}
+
+      <div className="p-6 flex flex-col flex-1">
+        {/* Plan header */}
+        <div className="text-center mb-5">
+          <div className="text-5xl mb-2">{plan.emoji}</div>
+          <h3 className="text-xl font-black text-gray-900">{plan.name}</h3>
+          <div className="mt-3">
+            <span className="text-4xl font-black" style={{ color: MAROON }}>₹{plan.price}</span>
+            <span className="text-gray-400 text-sm ml-1">/ {plan.duration}</span>
+          </div>
+        </div>
+
+        {/* Features */}
+        <ul className="flex flex-col gap-3 mb-6 flex-1">
+          {plan.features.map((f, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5" style={{ background: popular ? MAROON : '#E5E7EB' }}>
+                <Check size={11} className={popular ? 'text-white' : 'text-gray-600'} strokeWidth={3} />
+              </div>
+              <span className="text-sm text-gray-600 leading-snug">{f}</span>
+            </li>
+          ))}
+        </ul>
+
+        {/* CTA */}
+        <button
+          onClick={() => onUpgrade(plan)}
+          disabled={isCurrent}
+          className="w-full py-3 rounded-xl font-bold text-sm transition-all border-none cursor-pointer"
+          style={{
+            background: isCurrent ? '#E5E7EB' : popular ? `linear-gradient(135deg, ${MAROON}, #C0392B)` : 'transparent',
+            color: isCurrent ? '#9CA3AF' : popular ? 'white' : MAROON,
+            border: isCurrent ? 'none' : popular ? 'none' : `2px solid ${MAROON}`,
+            cursor: isCurrent ? 'default' : 'pointer',
+            boxShadow: popular && !isCurrent ? '0 4px 14px rgba(139,26,47,0.3)' : 'none',
+          }}
+        >
+          {isCurrent ? '✓ Current Plan' : 'Abhi Upgrade Karein'}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Subscription = () => {
   const { userProfile } = useAuthContext();
   const navigate = useNavigate();
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
-  const plans = [
-    {
-      title: "Basic",
-      price: "0",
-      duration: "Free",
-      icon: Zap,
-      color: "bg-gray-400",
-      features: [
-        "Create profile with 1 photo",
-        "View basic matches",
-        "Send 5 interests / day",
-        "Basic search filters"
-      ],
-      isCurrent: userProfile?.premiumPlan === 'none' || !userProfile?.isPremium
-    },
-    {
-      title: "Premium Gold",
-      price: "1,999",
-      duration: "3 Months",
-      icon: Star,
-      color: "bg-yellow-500",
-      popular: true,
-      features: [
-        "Unlimited interests",
-        "View phone numbers",
-        "Ad-free experience",
-        "Priority in search results",
-        "Premium verification badge"
-      ],
-      isCurrent: userProfile?.premiumPlan === 'gold'
-    },
-    {
-      title: "Royal Platinum",
-      price: "4,999",
-      duration: "12 Months",
-      icon: Crown,
-      color: "bg-purple-600",
-      features: [
-        "Everything in Gold plan",
-        "Direct chat with matches",
-        "Personalized relationship manager",
-        "Profile boost once a week",
-        "Exclusive matchmaking events"
-      ],
-      isCurrent: userProfile?.premiumPlan === 'platinum'
-    }
-  ];
+  const handleUpgrade = (plan) => setSelectedPlan(plan);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-16 px-4">
-      <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tight">Upgrade Your Search</h2>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto">
-            Choose the perfect plan to speed up your journey to finding the right life partner.
+    <div className="min-h-screen page-transition" style={{ background: 'linear-gradient(180deg, #FDF2F4 0%, #fff 40%)' }}>
+      {selectedPlan && <ComingSoonModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} />}
+
+      <div className="container mx-auto max-w-5xl px-4 py-8">
+
+        {/* Back */}
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 text-sm font-semibold mb-6 bg-transparent border-none cursor-pointer hover:opacity-70 transition-opacity"
+          style={{ color: MAROON }}
+        >
+          <ArrowLeft size={16} /> Wapas Jaao
+        </button>
+
+        {/* Header */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 shadow-lg"
+               style={{ background: `linear-gradient(135deg, ${MAROON}, #5C0E1E)` }}>
+            <Gem size={30} className="text-yellow-400" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 mb-3">
+            RistaSetu Premium 💎
+          </h1>
+          <p className="text-gray-500 text-base md:text-lg max-w-xl mx-auto">
+            Apna Rishta Jaldi Dhundho — Premium ke saath apni shaadi ki journey aur tez karein
           </p>
+
+          {/* Coming soon ribbon */}
+          <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full text-sm font-bold"
+               style={{ background: '#FFFBEC', border: `1px solid ${GOLD}`, color: '#92610A' }}>
+            <Zap size={14} style={{ color: GOLD }} />
+            Payment Gateway jald aayega — Tab tak free mein use karein!
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {plans.map((plan, idx) => (
-            <PlanCard key={idx} {...plan} />
+        {/* Plans grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-12 items-stretch pt-4">
+          {PLANS.map(plan => (
+            <PlanCard
+              key={plan.key}
+              plan={plan}
+              isCurrent={userProfile?.premiumPlan === plan.key}
+              onUpgrade={handleUpgrade}
+            />
           ))}
         </div>
 
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-gray-100 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="flex items-center gap-6">
-            <div className="p-4 bg-red-100 rounded-2xl">
-              <ShieldCheck size={48} className="text-red-600" />
-            </div>
-            <div>
-              <h4 className="text-2xl font-bold text-gray-800 mb-1">100% Secure & Trusted</h4>
-              <p className="text-gray-500">Your privacy and security are our top priorities. All payments are processed securely.</p>
-            </div>
+        {/* Free vs Premium comparison strip */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+          <h3 className="font-black text-lg text-gray-900 mb-4 text-center">Free vs Premium</h3>
+          <div className="grid grid-cols-3 gap-0 text-sm">
+            <div className="font-bold text-gray-500 pb-2 border-b">Feature</div>
+            <div className="font-bold text-gray-600 pb-2 border-b text-center">Free</div>
+            <div className="font-bold pb-2 border-b text-center" style={{ color: MAROON }}>Premium 💎</div>
+
+            {[
+              ['Photos',         '2',            '3–5'],
+              ['Interests/day',  '10',           'Unlimited'],
+              ['Biodata PDF',    '3/month',      'Unlimited'],
+              ['Profile Views',  '🔒 Hidden',    '✅ Visible'],
+              ['Verified Badge', '❌',           '✅'],
+              ['Profile Boost',  '❌',           '✅'],
+            ].map(([feat, free, prem]) => (
+              <>
+                <div key={feat} className="py-2.5 border-b text-gray-700 font-medium">{feat}</div>
+                <div key={`${feat}-f`} className="py-2.5 border-b text-center text-gray-500">{free}</div>
+                <div key={`${feat}-p`} className="py-2.5 border-b text-center font-semibold" style={{ color: MAROON }}>{prem}</div>
+              </>
+            ))}
           </div>
-          <Button variant="outline" className="whitespace-nowrap px-8 py-4 rounded-2xl font-bold border-2" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
-          </Button>
         </div>
+
+        {/* Security note */}
+        <p className="text-center text-xs text-gray-400">
+          🔒 Aapka data 100% secure hai · Payment gateway integrate hone ke baad instant upgrade milega
+        </p>
       </div>
     </div>
   );

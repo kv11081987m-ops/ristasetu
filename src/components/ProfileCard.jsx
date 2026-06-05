@@ -81,8 +81,13 @@ const ProfileCard = ({ profile, actionButton }) => {
   const isMatch = existingInterest?.status === 'accepted';
   const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin;
 
+  const isPremiumProfile = profile.isPremium;
+
   return (
-    <div className="bg-surface rounded-lg shadow-md overflow-hidden border flex flex-col h-full hover:shadow-lg transition-shadow duration-300">
+    <div
+      className="bg-surface rounded-lg shadow-md overflow-hidden flex flex-col h-full hover:shadow-lg transition-shadow duration-300"
+      style={isPremiumProfile ? { border: '2px solid #D4AF37', boxShadow: '0 2px 16px rgba(212,175,55,0.2)' } : { border: '1px solid var(--border)' }}
+    >
       <div className="relative group">
         <PhotoSlider
           photos={profile.photos?.length > 0 ? profile.photos : profile.photoUrl ? [profile.photoUrl] : []}
@@ -93,12 +98,20 @@ const ProfileCard = ({ profile, actionButton }) => {
         <div className="absolute top-3 right-3 bg-red-600/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-red-500 pointer-events-none">
           <span className="text-xs font-bold text-white">{matchPercentage}% Match</span>
         </div>
-        {profile.isVerified && (
-          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm pointer-events-none">
-            <BadgeCheck size={16} className="text-secondary" />
-            <span className="text-xs font-bold text-secondary">Verified</span>
-          </div>
-        )}
+        <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
+          {isPremiumProfile && (
+            <div className="px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"
+                 style={{ background: 'linear-gradient(90deg, #D4AF37, #F0C040)', color: '#7A4F00' }}>
+              <span className="text-xs font-black">💎 Premium</span>
+            </div>
+          )}
+          {profile.isVerified && (
+            <div className="bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+              <BadgeCheck size={13} className="text-secondary" />
+              <span className="text-xs font-bold text-secondary">Verified</span>
+            </div>
+          )}
+        </div>
       </div>
       
       <div className="p-4 flex-1 flex flex-col">

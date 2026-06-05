@@ -1,5 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { Download, Loader2, CheckCircle } from 'lucide-react';
+import { useAuthContext } from '../context/AuthContext';
+import PremiumModal from './PremiumModal';
+
+const _dlKey = () => {
+  const d = new Date();
+  return `rs_biodata_dl_${d.getFullYear()}_${d.getMonth()}`;
+};
+const getDlCount = () => parseInt(localStorage.getItem(_dlKey()) || '0', 10);
+const incDlCount = () => localStorage.setItem(_dlKey(), String(getDlCount() + 1));
 
 const MAROON = '#8B1A2F';
 const val = (v) => (v && String(v).trim()) ? String(v).trim() : null;
@@ -32,9 +41,18 @@ const Section = ({ title, children }) => (
 const BiodataDownloadButton = ({ profile, showContact = false, className = '' }) => {
   const templateRef = useRef(null);
   const [status, setStatus] = useState('idle');
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const { userProfile } = useAuthContext();
 
   const handleDownload = async () => {
     if (status === 'generating') return;
+
+    // Free users: max 3 downloads/month
+    if (!userProfile?.isPremium && getDlCount() >= 3) {
+      setShowPremiumModal(true);
+      return;
+    }
+
     setStatus('generating');
     try {
       const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
@@ -83,6 +101,7 @@ const BiodataDownloadButton = ({ profile, showContact = false, className = '' })
 
       const name = (profile.name || 'Profile').replace(/\s+/g, '_');
       pdf.save(`RistaSetu_Biodata_${name}.pdf`);
+      incDlCount();
       setStatus('done');
       setTimeout(() => setStatus('idle'), 3000);
     } catch (err) {
@@ -95,6 +114,12 @@ const BiodataDownloadButton = ({ profile, showContact = false, className = '' })
 
   return (
     <>
+      {showPremiumModal && (
+        <PremiumModal
+          feature="Biodata PDF download (3/month free limit)"
+          onClose={() => setShowPremiumModal(false)}
+        />
+      )}
       <button
         onClick={handleDownload}
         disabled={status === 'generating'}

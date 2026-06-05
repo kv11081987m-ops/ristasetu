@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import {
   LogOut, User, ChevronRight, Shield, Trash2, HelpCircle, ExternalLink,
   AlertTriangle, X, Loader2, Lock, Copy, Check, Eye, EyeOff, Camera,
-  FileText, Users, UserPlus, Trash,
+  FileText, Users, UserPlus, Trash, Zap,
 } from 'lucide-react';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
@@ -428,12 +428,17 @@ const PhotosModal = ({ onClose }) => {
   const [saved, setSaved] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
+  const maxPhotos = userProfile?.isPremium ? 5 : 2;
+
   const handleAddPhoto = (e) => {
     const files = Array.from(e.target.files);
     e.target.value = '';
     const newItems = [];
     for (const selected of files) {
-      if (photoItems.length + newItems.length >= 5) break;
+      if (photoItems.length + newItems.length >= maxPhotos) {
+        setError(`Free mein max ${maxPhotos} photos allowed hain. 💎 Premium mein upgrade karein.`);
+        break;
+      }
       const validationError = validateImageFile(selected);
       if (validationError) { setError(validationError); return; }
       newItems.push({ type: 'new', file: selected, preview: URL.createObjectURL(selected) });
@@ -495,7 +500,7 @@ const PhotosModal = ({ onClose }) => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900">Manage Photos</h3>
-                <p className="text-xs text-gray-400">{photoItems.length}/5 — pehli photo = main</p>
+                <p className="text-xs text-gray-400">{photoItems.length}/{maxPhotos} — pehli photo = main{!userProfile?.isPremium ? ' · 💎 Premium = 5' : ''}</p>
               </div>
             </div>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer">
@@ -527,7 +532,7 @@ const PhotosModal = ({ onClose }) => {
                 </button>
               </div>
             ))}
-            {photoItems.length < 5 && (
+            {photoItems.length < maxPhotos && (
               <label className="aspect-square rounded-lg border-2 border-dashed border-gray-300 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 hover:border-red-300 transition-colors">
                 <input type="file" accept="image/*" multiple onChange={handleAddPhoto} className="hidden" />
                 <span className="text-2xl text-gray-400 leading-none">+</span>
@@ -737,6 +742,27 @@ const Settings = () => {
         <p className="text-gray-500">Manage your profile and account preferences</p>
       </div>
 
+      {/* Premium Upgrade Banner */}
+      {!userProfile?.isPremium && (
+        <div
+          onClick={() => navigate('/premium')}
+          className="rounded-2xl p-4 mb-6 flex items-center justify-between gap-3 cursor-pointer hover:opacity-90 transition-opacity shadow-md"
+          style={{ background: 'linear-gradient(135deg, #8B1A2F, #5C0E1E)' }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">💎</span>
+            <div>
+              <p className="text-white font-black text-sm">RistaSetu Premium Upgrade Karein</p>
+              <p className="text-white/70 text-xs mt-0.5">Unlimited interests · Verified badge · Profile boost</p>
+            </div>
+          </div>
+          <div className="shrink-0 px-3 py-1.5 rounded-full text-xs font-black"
+               style={{ background: '#D4AF37', color: '#7A4F00' }}>
+            Plans Dekho →
+          </div>
+        </div>
+      )}
+
       {/* Profile Overview */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm mb-8 flex flex-col items-center text-center">
         <div className="relative w-20 h-20 mb-4">
@@ -823,6 +849,61 @@ const Settings = () => {
             }
             to="/kyc"
           />
+        </div>
+
+        {/* Kisne Dekha — locked for free users */}
+        {!userProfile?.isPremium && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Eye size={18} className="text-gray-500" />
+                <p className="font-bold text-sm text-gray-800">Kisne Dekha Aapka Profile</p>
+              </div>
+              <span className="text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1"
+                    style={{ background: '#FFFBEC', color: '#92610A', border: '1px solid #D4AF37' }}>
+                💎 Premium
+              </span>
+            </div>
+            {/* Blurred fake viewer avatars */}
+            <div className="relative h-12 mb-3">
+              <div className="flex gap-1.5 overflow-hidden">
+                {['#F87171','#60A5FA','#34D399','#FBBF24','#A78BFA'].map((c, i) => (
+                  <div key={i} className="w-10 h-10 rounded-full shrink-0 opacity-60 blur-[3px]" style={{ background: c }} />
+                ))}
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-gray-200 shadow-sm">
+                  <Lock size={13} className="text-gray-400" />
+                  <p className="text-xs text-gray-500 font-semibold">Premium mein unlock hoga</p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/premium')}
+              className="w-full text-xs font-bold py-2 rounded-lg border-none cursor-pointer transition-colors"
+              style={{ background: '#FDF2F4', color: '#8B1A2F', border: '1px solid #FECDD3' }}
+            >
+              💎 Premium mein Upgrade Karein
+            </button>
+          </div>
+        )}
+
+        {/* Profile Boost */}
+        <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm mb-3">
+          <div className="flex items-center gap-4">
+            <div className="p-2 rounded-lg bg-amber-50"><Zap size={20} className="text-amber-600" /></div>
+            <div>
+              <p className="font-bold text-sm text-gray-800">Profile Boost Karo</p>
+              <p className="text-xs text-gray-500">Search mein top pe aao — Silver/Gold mein</p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/premium')}
+            className="text-xs font-bold px-3 py-1.5 rounded-full border-none cursor-pointer"
+            style={{ background: '#FFFBEC', color: '#92610A', border: '1px solid #D4AF37' }}
+          >
+            💎 Boost
+          </button>
         </div>
 
         {/* Family Access Section */}
