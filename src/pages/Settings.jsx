@@ -18,7 +18,9 @@ import {
   Eye,
   EyeOff,
   Camera,
+  FileText,
 } from 'lucide-react';
+import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import {
@@ -616,6 +618,23 @@ const Settings = () => {
             description={userProfile?.hasPassword ? 'RistaSetu ID login ka password badlein' : 'RS ID se login ke liye password banayein'}
             onClick={() => setShowPasswordModal(true)}
           />
+          <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm mb-3">
+            <div className="flex items-center gap-4">
+              <div className="p-2 rounded-lg bg-gray-50 text-gray-600">
+                <FileText size={20} />
+              </div>
+              <div className="text-left">
+                <p className="font-bold text-sm text-gray-800">Download Biodata</p>
+                <p className="text-xs text-gray-500">Apna vivah biodata PDF mein download karein</p>
+              </div>
+            </div>
+            {userProfile && (
+              <BiodataDownloadButton
+                profile={{ ...userProfile, id: currentUser?.uid }}
+                showContact={true}
+              />
+            )}
+          </div>
           <SettingsItem
             icon={Shield}
             title="KYC Verification"

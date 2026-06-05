@@ -6,6 +6,7 @@ import Button from '../components/Button';
 import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock, Calendar, Loader2 } from 'lucide-react';
 import PhotoSlider from '../components/PhotoSlider';
 import { formatDate } from '../utils/formatDate';
+import BiodataDownloadButton from '../components/BiodataDownloadButton';
 
 const ProfileDetails = () => {
   const { id } = useParams();
@@ -179,12 +180,25 @@ const ProfileDetails = () => {
               <div className="w-full md:w-1/2">
                 {renderContactAction()}
               </div>
-              <button
-                className="flex items-center gap-2 text-sm text-light bg-transparent border-none cursor-pointer"
-                onClick={() => window.open(`mailto:ristasetu@gmail.com?subject=Report Profile ${profile.id}&body=I want to report the profile of ${profile.name} (ID: ${profile.id}). Reason: `, '_blank')}
-              >
-                <ShieldAlert size={16} /> Report Profile
-              </button>
+              <div className="flex flex-col items-end gap-2">
+                {(isOwner || isMatch) && (
+                  <BiodataDownloadButton
+                    profile={profile}
+                    showContact={isOwner || isMatch}
+                  />
+                )}
+                {!isOwner && !isMatch && (
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <Lock size={12} /> Interest accept hone ke baad biodata download hoga
+                  </div>
+                )}
+                <button
+                  className="flex items-center gap-2 text-sm text-light bg-transparent border-none cursor-pointer"
+                  onClick={() => window.open(`mailto:ristasetu@gmail.com?subject=Report Profile ${profile.id}&body=I want to report the profile of ${profile.name} (ID: ${profile.id}). Reason: `, '_blank')}
+                >
+                  <ShieldAlert size={16} /> Report Profile
+                </button>
+              </div>
             </div>
 
           </div>
