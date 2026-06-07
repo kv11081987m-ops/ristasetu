@@ -7,6 +7,7 @@ import {
   FileText, Users, UserPlus, Trash, Zap,
 } from 'lucide-react';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
+import ProfileAnalytics from '../components/ProfileAnalytics';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import {
@@ -798,6 +799,11 @@ const Settings = () => {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Meri Analytics */}
+      <div className="mb-8">
+        <ProfileAnalytics />
       </div>
 
       <div className="space-y-8">

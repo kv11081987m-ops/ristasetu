@@ -78,10 +78,12 @@ service cloud.firestore {
 
     // ── shortlists ────────────────────────────────────────────────────────
     // Family members can read/create/delete shortlists for their linked user.
+    // Profile owners can read (to count how many people shortlisted them).
     match /shortlists/{shortlistId} {
       allow read: if isAuth() && (
         resource.data.userId == request.auth.uid
         || isFamilyOf(resource.data.userId)
+        || resource.data.profileId == request.auth.uid
       );
 
       allow create: if isAuth() && (
@@ -150,6 +152,22 @@ service cloud.firestore {
       allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
       allow update: if isAuth() && resource.data.uid == request.auth.uid;
       allow delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
+    }
+
+    // ── analytics ─────────────────────────────────────────────────────────
+    // Only the profile owner can read their own analytics.
+    // Any authenticated user can create/update — but non-owners may only
+    // touch the view-count fields.
+    match /analytics/{userId} {
+      allow read: if isAuth() && isOwner(userId);
+
+      allow create: if isAuth();
+
+      allow update: if isAuth() && (
+        isOwner(userId)
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['profileViews', 'weeklyViews', 'lastUpdated'])
+      );
     }
 
     // ── notifications ─────────────────────────────────────────────────────

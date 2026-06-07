@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -7,6 +7,7 @@ import { BadgeCheck, Heart, ShieldAlert, ArrowLeft, Lock, Calendar, Loader2 } fr
 import PhotoSlider from '../components/PhotoSlider';
 import { formatDate } from '../utils/formatDate';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
+import { incrementProfileView } from '../utils/analyticsUtils';
 
 const ProfileDetails = () => {
   const { id } = useParams();
@@ -16,6 +17,13 @@ const ProfileDetails = () => {
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
 
   const profile = profiles.find(p => p.id === id);
+
+  // Track view — non-owner only, once per day per viewer (localStorage-guarded)
+  useEffect(() => {
+    if (!profile?.id || !currentUser?.uid) return;
+    if (currentUser.uid === profile.id || currentUser.uid === profile.uid) return;
+    incrementProfileView(profile.id, currentUser.uid);
+  }, [profile?.id, currentUser?.uid, profile?.uid]);
 
   if (loading) {
     return (
