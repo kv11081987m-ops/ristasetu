@@ -20,7 +20,8 @@ const notifLabel = (type) => {
   if (type === 'interest') return 'sent you an interest';
   if (type === 'accepted') return 'accepted your interest';
   if (type === 'birthday') return '🎂 Janam Din ki Shubhkamnayein!';
-  if (type === 'streak')   return '🔥 Login streak milestone!';
+  if (type === 'streak')      return '🔥 Login streak milestone!';
+  if (type === 'match_score') return '💚 Behtareen compatibility match!';
   return 'sent you a message';
 };
 
@@ -127,6 +128,7 @@ const Navbar = () => {
                               if (notif.type === 'message' || notif.type === 'accepted') navigate('/chat');
                               if (notif.type === 'interest') navigate('/interests');
                               if (notif.type === 'streak' || notif.type === 'birthday') navigate('/settings');
+                              if (notif.type === 'match_score') navigate('/dashboard');
                               setIsNotifOpen(false);
                             }}
                           >

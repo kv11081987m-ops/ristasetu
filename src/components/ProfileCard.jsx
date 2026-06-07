@@ -9,7 +9,7 @@ import { useAppContext } from '../context/AppContext';
 import { useToastContext } from '../context/ToastContext';
 import { useNotificationContext } from '../context/NotificationContext';
 
-import { calculateMatchPercentage } from '../utils/matchUtils';
+import { calculateCompatibility } from '../utils/matchUtils';
 import { CheckCircle, Clock } from 'lucide-react';
 import { isTodayBirthday, getBirthdayWishKey } from '../utils/birthdayUtils';
 
@@ -76,7 +76,8 @@ const ProfileCard = ({ profile, actionButton }) => {
     setCountdown(15);
   };
 
-  const matchPercentage = calculateMatchPercentage(userProfile, profile);
+  const compat = calculateCompatibility(userProfile, profile);
+  const { total: matchPercentage, label: compatLabel, color: compatColor } = compat;
   const isOwner = userProfile?.uid === profile.id || userProfile?.uid === profile.uid;
   const isAdmin = userProfile?.role === 'admin';
   const isMatch = existingInterest?.status === 'accepted';
@@ -119,8 +120,29 @@ const ProfileCard = ({ profile, actionButton }) => {
           canViewAll={isOwner || isAdmin || isMatch}
           imgClassName="w-full h-64 object-cover"
         />
-        <div className="absolute top-3 right-3 bg-red-600/90 backdrop-blur-sm px-2 py-1 rounded-full flex items-center gap-1 shadow-sm border border-red-500 pointer-events-none">
-          <span className="text-xs font-bold text-white">{matchPercentage}% Match</span>
+        {/* Compatibility score ring */}
+        <div className="absolute top-2 right-2 pointer-events-none flex flex-col items-center gap-0.5">
+          {(() => {
+            const r = 18, cx = 22, cy = 22;
+            const circ = 2 * Math.PI * r;
+            const dash = (matchPercentage / 100) * circ;
+            return (
+              <svg width="44" height="44" viewBox="0 0 44 44">
+                <circle cx={cx} cy={cy} r={r} fill="rgba(0,0,0,0.55)" />
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
+                <circle cx={cx} cy={cy} r={r} fill="none" stroke={compatColor} strokeWidth="3.5"
+                        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+                        transform={`rotate(-90 ${cx} ${cy})`} />
+                <text x={cx} y={cy + 4} textAnchor="middle" fontSize="9" fontWeight="800" fill="white">
+                  {matchPercentage}%
+                </text>
+              </svg>
+            );
+          })()}
+          <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm"
+                style={{ background: compatColor, color: '#fff', whiteSpace: 'nowrap' }}>
+            {compatLabel}
+          </span>
         </div>
         <div className="absolute top-3 left-3 flex flex-col gap-1 pointer-events-none">
           {isPremiumProfile && (

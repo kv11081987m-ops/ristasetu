@@ -8,6 +8,7 @@ import PhotoSlider from '../components/PhotoSlider';
 import { formatDate } from '../utils/formatDate';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { incrementProfileView } from '../utils/analyticsUtils';
+import CompatibilityBreakdown from '../components/CompatibilityBreakdown';
 
 const ProfileDetails = () => {
   const { id } = useParams();
@@ -182,6 +183,11 @@ const ProfileDetails = () => {
                 <p><strong>Phone:</strong> {profile.phone}</p>
                 <p><strong>Email:</strong> {profile.email}</p>
               </div>
+            )}
+
+            {/* Compatibility breakdown — shown to non-owners */}
+            {!isOwner && currentUserProfile && (
+              <CompatibilityBreakdown user={currentUserProfile} profile={profile} />
             )}
 
             <div className="flex flex-col md:flex-row gap-4 mt-8 pt-6 border-t items-center justify-between">

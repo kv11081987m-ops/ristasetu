@@ -4,7 +4,7 @@ import ProfileCard from '../components/ProfileCard';
 import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { Filter, UserPlus, Edit3, X } from 'lucide-react';
-import { calculateMatchPercentage } from '../utils/matchUtils';
+import { calculateMatchPercentage, calculateCompatibility } from '../utils/matchUtils';
 import CompletenessMeter from '../components/CompletenessMeter';
 import { calculateCompleteness } from '../utils/calculateCompleteness';
 import VerifiedBadge from '../components/VerifiedBadge';
@@ -81,6 +81,29 @@ const Dashboard = () => {
     ).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, userProfile?.dob]);
+
+  // 90%+ compatibility match notification — once per day
+  useEffect(() => {
+    if (!currentUser?.uid || !userProfile || profiles.length === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const key = `rs_top_match_notif_${currentUser.uid}_${today}`;
+    if (localStorage.getItem(key)) return;
+    const top = profiles
+      .filter(p => p.id !== currentUser.uid && p.role !== 'admin')
+      .map(p => ({ ...p, compat: calculateCompatibility(userProfile, p) }))
+      .filter(p => p.compat.total >= 90)
+      .sort((a, b) => b.compat.total - a.compat.total)[0];
+    if (!top) return;
+    localStorage.setItem(key, '1');
+    sendNotification(
+      currentUser.uid,
+      'match_score',
+      'RistaSetu',
+      top.photoUrl || null,
+      `💚 Ek behtareen match mila! ${top.name} ke saath aapka ${top.compat.total}% Milan hai!`
+    ).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, profiles.length]);
 
   if (!currentUser) return null;
 
