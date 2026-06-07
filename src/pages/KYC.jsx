@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { db } from '../firebase/firebaseConfig';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
-import { ShieldCheck, Upload, CheckCircle, Clock, ArrowLeft, Loader2, FileText } from 'lucide-react';
+import { ShieldCheck, Upload, CheckCircle, XCircle, Clock, ArrowLeft, Loader2, FileText } from 'lucide-react';
 import Button from '../components/Button';
 
 const DOC_TYPES = [
@@ -28,6 +28,7 @@ const KYC = () => {
   const [uploading, setUploading] = useState(false);
 
   const alreadySubmitted = userProfile?.kycStatus === 'submitted' || userProfile?.kycStatus === 'verified';
+  const isRejected = userProfile?.kycStatus === 'rejected';
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -52,6 +53,18 @@ const KYC = () => {
         kycDocumentNumber: docNumber.trim().toUpperCase(),
         kycDocumentUrl: docUrl,
         kycStatus: 'submitted',
+        kycSubmittedAt: serverTimestamp(),
+        kycRejectionReason: null,
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: currentUser.uid,
+        type: 'kyc_submitted',
+        fromId: 'system',
+        fromName: 'RistaSetu',
+        fromPhoto: null,
+        message: 'KYC documents submit ho gaye! Admin 24-48 ghante mein review karega.',
+        status: 'unread',
+        createdAt: serverTimestamp(),
       });
       showToast('KYC documents submit ho gaye! Admin review karega.', 'success');
       navigate('/settings');
@@ -98,8 +111,21 @@ const KYC = () => {
           <div className="mx-6 mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center gap-3">
             <Clock size={20} className="text-yellow-600 shrink-0" />
             <div>
-              <p className="font-bold text-yellow-800">Review Pending</p>
+              <p className="font-bold text-yellow-800">🟡 Review Pending</p>
               <p className="text-sm text-yellow-700">Aapke documents submit ho gaye hain. 24-48 ghante mein review hoga.</p>
+            </div>
+          </div>
+        )}
+
+        {isRejected && (
+          <div className="mx-6 mt-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <XCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-red-800">❌ KYC Reject Hua</p>
+              <p className="text-sm text-red-700 mt-1">
+                {userProfile?.kycRejectionReason || 'Documents verify nahi ho sake.'}
+              </p>
+              <p className="text-xs text-red-500 mt-1">Neeche sahi documents ke saath dobara submit karein.</p>
             </div>
           </div>
         )}

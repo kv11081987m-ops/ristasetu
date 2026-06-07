@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, updateDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, addDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import { 
-  ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock, 
-  Menu, X, LayoutDashboard, Settings, LogOut, Bell
+import {
+  ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock,
+  Menu, X, LayoutDashboard, Settings, LogOut, Bell, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
@@ -23,6 +23,8 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [pendingStories, setPendingStories] = useState([]);
   const [storiesLoading, setStoriesLoading] = useState(true);
+  const [pendingKyc, setPendingKyc] = useState([]);
+  const [kycLoading, setKycLoading] = useState(true);
 
   const navigate = useNavigate();
 
@@ -66,6 +68,89 @@ const AdminDashboard = () => {
     };
     fetchStories();
   }, []);
+
+  useEffect(() => {
+    const fetchPendingKyc = async () => {
+      try {
+        const q = query(collection(db, 'users'), where('kycStatus', '==', 'submitted'));
+        const snap = await getDocs(q);
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.kycSubmittedAt?.toMillis?.() ?? 0;
+            const tb = b.kycSubmittedAt?.toMillis?.() ?? 0;
+            return ta - tb;
+          });
+        setPendingKyc(list);
+      } catch (e) {
+        console.error('KYC fetch error:', e);
+      } finally {
+        setKycLoading(false);
+      }
+    };
+    fetchPendingKyc();
+  }, []);
+
+  const approveKyc = async (user) => {
+    try {
+      setUpdatingId(user.id);
+      await updateDoc(doc(db, 'users', user.id), {
+        isVerified: true,
+        kycStatus: 'verified',
+        kycVerifiedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: user.id,
+        type: 'kyc_approved',
+        fromId: 'admin',
+        fromName: 'RistaSetu Admin',
+        fromPhoto: null,
+        message: '✅ KYC Verify ho gayi! Ab aapke profile pe Verified badge dikhega.',
+        status: 'unread',
+        createdAt: serverTimestamp(),
+      });
+      setPendingKyc(prev => prev.filter(u => u.id !== user.id));
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, isVerified: true, kycStatus: 'verified' } : u));
+      setNotification({ message: `${user.name || 'User'} ki KYC approve ho gayi!`, type: 'success' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('KYC approve karne mein error. Dobara try karein.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const rejectKyc = async (user) => {
+    const reason = window.prompt(`${user.name || 'User'} ki KYC reject karne ka reason (user ko dikhega):`);
+    if (reason === null) return;
+    try {
+      setUpdatingId(user.id);
+      const rejectionMsg = reason.trim() || 'Documents unclear hain.';
+      await updateDoc(doc(db, 'users', user.id), {
+        kycStatus: 'rejected',
+        kycRejectionReason: rejectionMsg,
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: user.id,
+        type: 'kyc_rejected',
+        fromId: 'admin',
+        fromName: 'RistaSetu Admin',
+        fromPhoto: null,
+        message: `❌ KYC Reject hua — ${rejectionMsg}. KYC page pe dobara submit karein.`,
+        status: 'unread',
+        createdAt: serverTimestamp(),
+      });
+      setPendingKyc(prev => prev.filter(u => u.id !== user.id));
+      setNotification({ message: `${user.name || 'User'} ki KYC reject ho gayi.`, type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (e) {
+      console.error(e);
+      alert('KYC reject karne mein error. Dobara try karein.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const loadMore = async () => {
     if (!lastDoc || loadingMore) return;
@@ -145,6 +230,7 @@ const AdminDashboard = () => {
     total: users.length,
     verified: users.filter(u => u.isVerified).length,
     pending: users.filter(u => !u.isVerified).length,
+    kycPending: pendingKyc.length,
   };
 
   const filteredUsers = users.filter(user => {
@@ -226,7 +312,7 @@ const AdminDashboard = () => {
 
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           {/* Stats Section */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="p-4 bg-blue-100 text-blue-600 rounded-2xl">
                 <Users size={24} />
@@ -247,13 +333,23 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-shadow">
               <div className="p-4 bg-orange-100 text-orange-600 rounded-2xl">
                 <Clock size={24} />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Pending Approvals</p>
                 <h3 className="text-2xl font-bold text-gray-800">{stats.pending}</h3>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover:shadow-md transition-shadow">
+              <div className="p-4 bg-yellow-100 text-yellow-600 rounded-2xl">
+                <FileText size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">KYC Pending</p>
+                <h3 className="text-2xl font-bold text-gray-800">{stats.kycPending}</h3>
               </div>
             </div>
           </div>
@@ -390,6 +486,88 @@ const AdminDashboard = () => {
               </button>
             </div>
           )}
+
+          {/* KYC Requests */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-8">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-yellow-600" /> KYC Verification Requests
+                </h2>
+                <p className="text-sm text-gray-400 mt-0.5">Pending document review — approve ya reject karein</p>
+              </div>
+              {pendingKyc.length > 0 && (
+                <span className="bg-yellow-100 text-yellow-700 font-bold text-xs px-3 py-1.5 rounded-full border border-yellow-200">
+                  {pendingKyc.length} Pending
+                </span>
+              )}
+            </div>
+            <div className="p-6">
+              {kycLoading ? (
+                <div className="text-center py-8 text-gray-400"><Loader2 size={24} className="animate-spin mx-auto" /></div>
+              ) : pendingKyc.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle size={32} className="mx-auto text-green-300 mb-2" />
+                  <p className="text-gray-400 font-medium">Koi pending KYC request nahi hai</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {pendingKyc.map(user => (
+                    <div key={user.id} className="border border-yellow-100 rounded-xl p-4 bg-yellow-50/30">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
+                          {user.photoUrl
+                            ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-sm">{(user.name || 'U').charAt(0)}</div>
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-800">{user.name || 'Unknown'}</p>
+                          <p className="text-xs text-gray-500">{user.phone || user.email || 'No contact'}</p>
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
+                            <span className="text-xs text-gray-500 capitalize">
+                              📄 {user.kycDocumentType?.replace('_', ' ') || 'Unknown doc'} — {user.kycDocumentNumber || '—'}
+                            </span>
+                            {user.kycSubmittedAt && (
+                              <span className="text-xs text-gray-400">
+                                Submitted: {user.kycSubmittedAt?.toDate?.()?.toLocaleDateString('en-IN') || '—'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {user.kycDocumentUrl && (
+                            <a
+                              href={user.kycDocumentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                            >
+                              📄 View Doc
+                            </a>
+                          )}
+                          <button
+                            onClick={() => approveKyc(user)}
+                            disabled={updatingId === user.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-xs hover:bg-green-100 transition-colors disabled:opacity-50"
+                          >
+                            <CheckCircle size={13} /> Approve
+                          </button>
+                          <button
+                            onClick={() => rejectKyc(user)}
+                            disabled={updatingId === user.id}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors disabled:opacity-50"
+                          >
+                            <XCircle size={13} /> Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Success Stories Approval */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-8">
