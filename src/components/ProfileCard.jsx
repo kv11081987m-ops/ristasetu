@@ -14,14 +14,14 @@ import { CheckCircle, Clock } from 'lucide-react';
 import { isTodayBirthday, getBirthdayWishKey } from '../utils/birthdayUtils';
 
 const ProfileCard = ({ profile, actionButton }) => {
-  const { isProfileComplete, userProfile } = useAuthContext();
+  const { isProfileComplete, userProfile, currentUser } = useAuthContext();
   const { sendInterest, interests, chats, sendMessage } = useAppContext();
   const { showToast } = useToastContext();
   const { sendNotification } = useNotificationContext();
 
   const existingInterest = interests.find(
-    i => (i.senderId === userProfile?.uid && i.receiverId === profile.id) || 
-         (i.receiverId === userProfile?.uid && i.senderId === profile.id)
+    i => (i.senderId === currentUser?.uid && i.receiverId === profile.id) ||
+         (i.receiverId === currentUser?.uid && i.senderId === profile.id)
   );
 
   const [interestStatus, setInterestStatus] = useState('idle'); // 'idle', 'sending', 'sent'
@@ -47,7 +47,7 @@ const ProfileCard = ({ profile, actionButton }) => {
     timerRef.current = setTimeout(async () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
       try {
-        await sendInterest(profile.id, userProfile.uid);
+        await sendInterest(profile.id, currentUser?.uid);
         setInterestStatus('sent');
         sendNotification(profile.id, 'interest', userProfile?.name || 'Someone', userProfile?.photoUrl || null, null).catch(() => {});
       } catch (err) {
@@ -78,7 +78,7 @@ const ProfileCard = ({ profile, actionButton }) => {
 
   const compat = calculateCompatibility(userProfile, profile);
   const { total: matchPercentage, label: compatLabel, color: compatColor } = compat;
-  const isOwner = userProfile?.uid === profile.id || userProfile?.uid === profile.uid;
+  const isOwner = currentUser?.uid === profile.id || currentUser?.uid === profile.uid;
   const isAdmin = userProfile?.role === 'admin';
   const isMatch = existingInterest?.status === 'accepted';
   const isPhotoHidden = profile.showPhotoToAll === false && !isOwner && !isAdmin;
@@ -87,21 +87,21 @@ const ProfileCard = ({ profile, actionButton }) => {
 
   const isMatchBirthday = isTodayBirthday(profile.dob);
   const matchChat = isMatch && chats
-    ? chats.find(c => c.participants?.includes(userProfile?.uid) && c.participants?.includes(profile.id))
+    ? chats.find(c => c.participants?.includes(currentUser?.uid) && c.participants?.includes(profile.id))
     : null;
 
   const [wishSent, setWishSent] = useState(() => {
-    if (!isMatchBirthday || !userProfile?.uid || !profile.id) return false;
-    return !!localStorage.getItem(getBirthdayWishKey(userProfile.uid, profile.id));
+    if (!isMatchBirthday || !currentUser?.uid || !profile.id) return false;
+    return !!localStorage.getItem(getBirthdayWishKey(currentUser.uid, profile.id));
   });
 
   const handleBirthdayWish = async () => {
-    if (!matchChat || !userProfile?.uid || wishSent) return;
-    const key = getBirthdayWishKey(userProfile.uid, profile.id);
+    if (!matchChat || !currentUser?.uid || wishSent) return;
+    const key = getBirthdayWishKey(currentUser.uid, profile.id);
     localStorage.setItem(key, '1');
     setWishSent(true);
     try {
-      await sendMessage(matchChat.id, 'Janam Din ki Shubhkamnayein! 🎂', userProfile.uid);
+      await sendMessage(matchChat.id, 'Janam Din ki Shubhkamnayein! 🎂', currentUser.uid);
       showToast('Birthday wish bheja gaya! 🎂', 'success');
     } catch {
       showToast('Wish bhejne mein error. Dobara try karein.', 'error');
