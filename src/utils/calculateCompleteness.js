@@ -32,8 +32,8 @@ export const calculateCompleteness = (user) => {
     score += 10;
   }
 
-  // About (20%)
-  if (user.aboutMe && user.aboutMe.trim() !== '') {
+  // About (20%) — field saved as 'about' in CompleteProfile, legacy 'aboutMe' also checked
+  if ((user.about || user.aboutMe)?.trim()) {
     score += 20;
   }
 
