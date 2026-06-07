@@ -13,6 +13,7 @@ const CompleteProfile = () => {
   
   const [formData, setFormData] = useState({
     name: '',
+    dob: '',
     age: '',
     gender: 'Male',
     religion: 'Hindu',
@@ -30,6 +31,15 @@ const CompleteProfile = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'dob' && value) {
+      const today = new Date();
+      const dobDate = new Date(value);
+      const age = today.getFullYear() - dobDate.getFullYear() -
+        (today.getMonth() < dobDate.getMonth() ||
+         (today.getMonth() === dobDate.getMonth() && today.getDate() < dobDate.getDate()) ? 1 : 0);
+      setFormData(prev => ({ ...prev, dob: value, age: String(age) }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -139,6 +149,19 @@ const CompleteProfile = () => {
             <div className="form-group mb-0">
               <label className="form-label">Full Name</label>
               <input type="text" name="name" value={formData.name} onChange={handleInputChange} required className="form-input" placeholder="e.g. Aarav Sharma" />
+            </div>
+
+            <div className="form-group mb-0">
+              <label className="form-label">Date of Birth / Janm Tithi</label>
+              <input
+                type="date"
+                name="dob"
+                value={formData.dob}
+                onChange={handleInputChange}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().slice(0, 10)}
+                className="form-input"
+              />
+              <p className="text-[10px] text-light mt-1">Birthday wishes ke liye (optional)</p>
             </div>
 
             <div className="form-group mb-0">

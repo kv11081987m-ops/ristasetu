@@ -11,10 +11,11 @@ import { useNotificationContext } from '../context/NotificationContext';
 
 import { calculateMatchPercentage } from '../utils/matchUtils';
 import { CheckCircle, Clock } from 'lucide-react';
+import { isTodayBirthday, getBirthdayWishKey } from '../utils/birthdayUtils';
 
 const ProfileCard = ({ profile, actionButton }) => {
   const { isProfileComplete, userProfile } = useAuthContext();
-  const { sendInterest, interests } = useAppContext();
+  const { sendInterest, interests, chats, sendMessage } = useAppContext();
   const { showToast } = useToastContext();
   const { sendNotification } = useNotificationContext();
 
@@ -83,6 +84,29 @@ const ProfileCard = ({ profile, actionButton }) => {
 
   const isPremiumProfile = profile.isPremium;
 
+  const isMatchBirthday = isTodayBirthday(profile.dob);
+  const matchChat = isMatch && chats
+    ? chats.find(c => c.participants?.includes(userProfile?.uid) && c.participants?.includes(profile.id))
+    : null;
+
+  const [wishSent, setWishSent] = useState(() => {
+    if (!isMatchBirthday || !userProfile?.uid || !profile.id) return false;
+    return !!localStorage.getItem(getBirthdayWishKey(userProfile.uid, profile.id));
+  });
+
+  const handleBirthdayWish = async () => {
+    if (!matchChat || !userProfile?.uid || wishSent) return;
+    const key = getBirthdayWishKey(userProfile.uid, profile.id);
+    localStorage.setItem(key, '1');
+    setWishSent(true);
+    try {
+      await sendMessage(matchChat.id, 'Janam Din ki Shubhkamnayein! 🎂', userProfile.uid);
+      showToast('Birthday wish bheja gaya! 🎂', 'success');
+    } catch {
+      showToast('Wish bhejne mein error. Dobara try karein.', 'error');
+    }
+  };
+
   return (
     <div
       className="bg-surface rounded-lg shadow-md overflow-hidden flex flex-col h-full hover:shadow-lg transition-shadow duration-300"
@@ -111,6 +135,12 @@ const ProfileCard = ({ profile, actionButton }) => {
               <span className="text-xs font-bold text-secondary">Verified</span>
             </div>
           )}
+          {isMatchBirthday && (
+            <div className="px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm"
+                 style={{ background: 'linear-gradient(90deg, #7B1C1C, #B7860B)', color: '#FFE66D' }}>
+              <span className="text-xs font-black">🎂 Birthday</span>
+            </div>
+          )}
         </div>
       </div>
       
@@ -124,6 +154,13 @@ const ProfileCard = ({ profile, actionButton }) => {
           <MapPin size={16} className="text-secondary" />
           <span>{profile.city}{profile.state ? `, ${profile.state}` : ''}</span>
         </div>
+        {isMatchBirthday && (
+          <div className="flex items-center gap-1.5 text-xs font-semibold mb-1 px-2 py-1 rounded-md"
+               style={{ background: 'linear-gradient(90deg, #fff1f1, #fffbeb)', color: '#92400e' }}>
+            <span>🎂</span>
+            <span>Aaj inका janam din hai!</span>
+          </div>
+        )}
         
         <div className="flex items-center gap-2 text-sm text-light mb-3">
           <Briefcase size={16} className="text-secondary" />
@@ -211,6 +248,20 @@ const ProfileCard = ({ profile, actionButton }) => {
                 )}
               </div>
             </div>
+          )}
+
+          {isMatchBirthday && isMatch && matchChat && (
+            <button
+              onClick={handleBirthdayWish}
+              disabled={wishSent}
+              className="w-full mt-1 py-2 text-xs font-bold rounded-lg transition-all border-none cursor-pointer"
+              style={wishSent
+                ? { background: '#D1FAE5', color: '#065F46', cursor: 'default' }
+                : { background: 'linear-gradient(90deg, #7B1C1C, #B7860B)', color: '#FFE66D' }
+              }
+            >
+              {wishSent ? '🎉 Wish Bheja Ja Chuka Hai' : '🎂 Birthday Wish Bhejo'}
+            </button>
           )}
         </div>
       </div>

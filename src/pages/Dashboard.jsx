@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import ProfileCard from '../components/ProfileCard';
 import { useAppContext } from '../context/AppContext';
@@ -9,6 +9,9 @@ import CompletenessMeter from '../components/CompletenessMeter';
 import { calculateCompleteness } from '../utils/calculateCompleteness';
 import VerifiedBadge from '../components/VerifiedBadge';
 import Button from '../components/Button';
+import BirthdayBanner from '../components/BirthdayBanner';
+import { isTodayBirthday, getBirthdayNotifKey } from '../utils/birthdayUtils';
+import { useNotificationContext } from '../context/NotificationContext';
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
@@ -37,6 +40,25 @@ const Dashboard = () => {
     minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: ''
   });
 
+
+  const { sendNotification } = useNotificationContext();
+
+  // Send birthday notification once per day when it's the user's birthday
+  useEffect(() => {
+    if (!currentUser || !userProfile?.dob) return;
+    if (!isTodayBirthday(userProfile.dob)) return;
+    const key = getBirthdayNotifKey(currentUser.uid);
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
+    sendNotification(
+      currentUser.uid,
+      'birthday',
+      'RistaSetu',
+      null,
+      'Janam Din ki Shubhkamnayein! 🎂'
+    ).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid, userProfile?.dob]);
 
   if (!currentUser) return null;
 
@@ -76,6 +98,10 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 page-transition">
+      {userProfile?.dob && isTodayBirthday(userProfile.dob) && (
+        <BirthdayBanner userName={userProfile.name} uid={currentUser.uid} />
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">

@@ -19,6 +19,7 @@ const timeAgo = (ts) => {
 const notifLabel = (type) => {
   if (type === 'interest') return 'sent you an interest';
   if (type === 'accepted') return 'accepted your interest';
+  if (type === 'birthday') return '🎂 Janam Din ki Shubhkamnayein!';
   return 'sent you a message';
 };
 
