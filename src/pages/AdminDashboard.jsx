@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, updateDoc, getDocs, query, orderBy, limit, startAfter } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { 
   ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock, 
@@ -21,6 +21,8 @@ const AdminDashboard = () => {
   const [notification, setNotification] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pendingStories, setPendingStories] = useState([]);
+  const [storiesLoading, setStoriesLoading] = useState(true);
 
   const navigate = useNavigate();
 
@@ -40,6 +42,21 @@ const AdminDashboard = () => {
       }
     };
     fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const fetchStories = async () => {
+      try {
+        const q = query(collection(db, 'success_stories'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        setPendingStories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (e) {
+        console.error('Stories fetch error:', e);
+      } finally {
+        setStoriesLoading(false);
+      }
+    };
+    fetchStories();
   }, []);
 
   const loadMore = async () => {
@@ -95,6 +112,25 @@ const AdminDashboard = () => {
     } finally {
       setUpdatingId(null);
     }
+  };
+
+  const approveStory = async (storyId) => {
+    try {
+      await updateDoc(doc(db, 'success_stories', storyId), { status: 'approved', approvedAt: serverTimestamp() });
+      setPendingStories(prev => prev.filter(s => s.id !== storyId));
+      setNotification({ message: 'Story approved and published!', type: 'success' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (e) { console.error(e); }
+  };
+
+  const rejectStory = async (storyId) => {
+    if (!window.confirm('Is story ko reject karein?')) return;
+    try {
+      await updateDoc(doc(db, 'success_stories', storyId), { status: 'rejected' });
+      setPendingStories(prev => prev.filter(s => s.id !== storyId));
+      setNotification({ message: 'Story rejected.', type: 'error' });
+      setTimeout(() => setNotification(null), 3000);
+    } catch (e) { console.error(e); }
   };
 
   const stats = {
@@ -346,6 +382,65 @@ const AdminDashboard = () => {
               </button>
             </div>
           )}
+
+          {/* Success Stories Approval */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mt-8">
+            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <span style={{ fontSize: '1.2rem' }}>💍</span> Success Stories — Pending Approval
+                </h2>
+                <p className="text-sm text-gray-400 mt-0.5">Approve karne pe public page par dikhegi (agar Public chuni ho)</p>
+              </div>
+              {pendingStories.length > 0 && (
+                <span className="bg-orange-100 text-orange-700 font-bold text-xs px-3 py-1.5 rounded-full border border-orange-200">
+                  {pendingStories.length} Pending
+                </span>
+              )}
+            </div>
+            <div className="p-6">
+              {storiesLoading ? (
+                <div className="text-center py-8 text-gray-400"><Loader2 size={24} className="animate-spin mx-auto" /></div>
+              ) : pendingStories.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400 font-medium">Koi pending story nahi hai</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {pendingStories.map(story => (
+                    <div key={story.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        {story.photoUrl ? (
+                          <img src={story.photoUrl} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 text-2xl">💑</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-gray-800">{story.name1} &amp; {story.name2}</div>
+                          <div className="text-xs text-gray-400 mb-2">{[story.city, story.year, story.isPublic ? '🌐 Public' : '🔒 Private'].filter(Boolean).join(' • ')}</div>
+                          <p className="text-sm text-gray-600 italic line-clamp-3">"{story.story}"</p>
+                        </div>
+                        <div className="flex flex-col gap-2 flex-shrink-0 ml-2">
+                          <button
+                            onClick={() => approveStory(story.id)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-xs hover:bg-green-100 transition-colors"
+                          >
+                            <CheckCircle size={13} /> Approve
+                          </button>
+                          <button
+                            onClick={() => rejectStory(story.id)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-lg font-bold text-xs hover:bg-red-100 transition-colors"
+                          >
+                            <XCircle size={13} /> Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </main>
 
         {/* Notifications */}

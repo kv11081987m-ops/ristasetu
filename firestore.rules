@@ -171,6 +171,38 @@ service cloud.firestore {
       allow write: if isAuth();
     }
 
+    // ── shaadi_requests ───────────────────────────────────────────────────
+    // Doc ID = chatId. Tracks marriage confirmation between two matched users.
+    match /shaadi_requests/{chatId} {
+      allow read: if isAuth() && (
+        resource.data.initiatorId == request.auth.uid ||
+        resource.data.receiverId == request.auth.uid
+      );
+      allow create: if isAuth() && request.resource.data.initiatorId == request.auth.uid;
+      allow update: if isAuth() && (
+        resource.data.receiverId == request.auth.uid ||
+        resource.data.initiatorId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ── success_stories ───────────────────────────────────────────────────
+    match /success_stories/{storyId} {
+      allow read: if
+        (resource.data.status == 'approved' && resource.data.isPublic == true)
+        || (isAuth() && (
+          resource.data.userId1 == request.auth.uid
+          || resource.data.userId2 == request.auth.uid
+        ))
+        || isAdmin();
+      allow create: if isAuth() && (
+        request.resource.data.userId1 == request.auth.uid ||
+        request.resource.data.userId2 == request.auth.uid
+      );
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ── analytics ─────────────────────────────────────────────────────────
     // Only the profile owner can read their own analytics.
     // Any authenticated user can create/update — but non-owners may only

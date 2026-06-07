@@ -7,6 +7,8 @@ import { MessageSquare, Home, MoreVertical, ArrowLeft, Smile, Send, X } from 'lu
 import { db } from '../firebase/firebaseConfig';
 import { collection, onSnapshot, orderBy, query, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { ICEBREAKER_CATEGORIES, getSmartSuggestions } from '../utils/icebreakerQuestions';
+import { initiateShaadi, confirmShaadi, declineShaadi, submitSuccessStory } from '../utils/shaadiUtils';
+import { uploadToCloudinary } from '../utils/uploadUtils';
 
 const T = {
   bg: '#2D1B5E',
@@ -326,6 +328,14 @@ const Chat = () => {
   const [fetchedProfiles, setFetchedProfiles] = useState({});
   const [readChatIds, setReadChatIds] = useState(new Set());
   const [showIcebreaker, setShowIcebreaker] = useState(false);
+  const [shaadiRequest, setShaadiRequest] = useState(null);
+  const [showShaadiModal, setShowShaadiModal] = useState(false);
+  const [showStoryModal, setShowStoryModal] = useState(false);
+  const [storyText, setStoryText] = useState('');
+  const [storyPhotoFile, setStoryPhotoFile] = useState(null);
+  const [storyIsPublic, setStoryIsPublic] = useState(true);
+  const [storySubmitting, setStorySubmitting] = useState(false);
+  const [storyDone, setStoryDone] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -362,6 +372,14 @@ const Chat = () => {
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [myChats.length, profiles.length]);
+
+  // Subscribe to shaadi_request for active chat
+  useEffect(() => {
+    if (!activeChatId) { setShaadiRequest(null); return; }
+    return onSnapshot(doc(db, 'shaadi_requests', activeChatId), snap => {
+      setShaadiRequest(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+    });
+  }, [activeChatId]);
 
   // Subscribe to messages
   useEffect(() => {
@@ -418,6 +436,51 @@ const Chat = () => {
     setText(question);
     setShowIcebreaker(false);
     setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const handleInitiateShaadi = async () => {
+    if (!activeChatId || !otherUser?.id) return;
+    try {
+      await initiateShaadi(activeChatId, currentUser.uid, otherUser.id);
+      sendNotification(otherUser.id, 'shaadi_request', userProfile?.name, userProfile?.photoUrl || null, 'ne shaadi confirm ki request bheji hai 💍').catch(() => {});
+      setShowShaadiModal(false);
+    } catch (e) { console.error('Shaadi initiate error:', e); }
+  };
+
+  const handleConfirmShaadi = async () => {
+    if (!activeChatId || !otherUser?.id) return;
+    try {
+      await confirmShaadi(activeChatId, currentUser.uid, otherUser.id);
+      sendNotification(currentUser.uid, 'shaadi_confirmed', 'RistaSetu', null, '💍 Mubarak ho! Aapki shaadi RistaSetu se confirm hui!').catch(() => {});
+      sendNotification(otherUser.id, 'shaadi_confirmed', 'RistaSetu', null, '💍 Mubarak ho! Aapki shaadi RistaSetu se confirm hui!').catch(() => {});
+      setShowStoryModal(true);
+    } catch (e) { console.error('Confirm shaadi error:', e); }
+  };
+
+  const handleDeclineShaadi = async () => {
+    if (!activeChatId) return;
+    try { await declineShaadi(activeChatId); } catch (e) { console.error(e); }
+  };
+
+  const handleSubmitStory = async () => {
+    if (!storyText.trim()) return;
+    setStorySubmitting(true);
+    try {
+      let photoUrl = null;
+      if (storyPhotoFile) photoUrl = await uploadToCloudinary(storyPhotoFile);
+      await submitSuccessStory({
+        userId1: currentUser.uid,
+        userId2: otherUser?.id || '',
+        name1: userProfile?.name || '',
+        name2: otherUser?.name || '',
+        city: userProfile?.city || '',
+        year: new Date().getFullYear(),
+        story: storyText.trim(),
+        photoUrl,
+        isPublic: storyIsPublic,
+      });
+      setStoryDone(true);
+    } catch (e) { console.error(e); } finally { setStorySubmitting(false); }
   };
 
   const handleSend = async (e) => {
@@ -545,13 +608,68 @@ const Chat = () => {
                 </div>
                 <div style={{ color: T.gold, fontSize: '0.65rem', marginTop: '1px' }}>Online</div>
               </div>
-              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.gold, padding: '0.25rem', display: 'flex', alignItems: 'center' }}>
-                <MoreVertical size={20} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                {(!shaadiRequest || shaadiRequest.status === 'declined') && (
+                  <button
+                    onClick={() => setShowShaadiModal(true)}
+                    title="Shaadi Confirm Karein"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', lineHeight: 1, padding: '0.25rem', opacity: 0.8, transition: 'opacity 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.8'; }}
+                  >
+                    💍
+                  </button>
+                )}
+                {shaadiRequest?.status === 'pending' && (
+                  <span title="Shaadi request pending" style={{ fontSize: '1.1rem', opacity: 0.6 }}>💍⏳</span>
+                )}
+                {shaadiRequest?.status === 'confirmed' && (
+                  <span title="Shaadi Confirmed!" style={{ fontSize: '1rem', color: T.gold, fontWeight: 'bold' }}>💍✓</span>
+                )}
+                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.gold, padding: '0.25rem', display: 'flex', alignItems: 'center' }}>
+                  <MoreVertical size={20} />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {/* Shaadi confirmation banner */}
+              {shaadiRequest?.status === 'pending' && shaadiRequest.initiatorId === currentUser?.uid && (
+                <div style={{ margin: '0.75rem 0', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '0.875rem', padding: '0.875rem 1rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.25rem', marginBottom: '4px' }}>💍</div>
+                  <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.875rem', marginBottom: '3px' }}>Shaadi Confirm ki Request Bheji Gayi</div>
+                  <div style={{ color: T.ts, fontSize: '0.75rem' }}>{otherUser?.name || 'Unka'} jawab aane tak intezaar karein...</div>
+                </div>
+              )}
+              {shaadiRequest?.status === 'pending' && shaadiRequest.receiverId === currentUser?.uid && (
+                <div style={{ margin: '0.75rem 0', background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.5)', borderRadius: '0.875rem', padding: '1rem' }}>
+                  <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>💍</div>
+                    <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '3px' }}>{otherUser?.name} ne shaadi confirm ki request bheji hai!</div>
+                    <div style={{ color: T.ts, fontSize: '0.75rem' }}>Kya aap sehmat hain?</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={handleDeclineShaadi} style={{ flex: 1, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', color: '#FCA5A5', borderRadius: '0.5rem', padding: '0.5rem', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      ❌ Nahi
+                    </button>
+                    <button onClick={handleConfirmShaadi} style={{ flex: 1, background: 'rgba(212,175,55,0.2)', border: '1px solid rgba(212,175,55,0.5)', color: T.gold, borderRadius: '0.5rem', padding: '0.5rem', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      ✅ Haan
+                    </button>
+                  </div>
+                </div>
+              )}
+              {shaadiRequest?.status === 'confirmed' && (
+                <div style={{ margin: '0.75rem 0', background: 'linear-gradient(135deg,rgba(212,175,55,0.15),rgba(212,175,55,0.07))', border: '1.5px solid #D4AF37', borderRadius: '0.875rem', padding: '1rem', textAlign: 'center' }}>
+                  <div style={{ fontSize: '1.75rem', marginBottom: '4px' }}>🎉</div>
+                  <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.9rem' }}>Mubarak ho! Aapki shaadi confirm hui!</div>
+                  <div style={{ color: T.ts, fontSize: '0.75rem', marginTop: '3px' }}>RistaSetu ki taraf se dil ki gehraaiyon se badhai! 💍</div>
+                  <button onClick={() => { setStoryDone(false); setShowStoryModal(true); }} style={{ marginTop: '0.75rem', background: T.gold, color: '#1A0D3D', border: 'none', borderRadius: '0.5rem', padding: '0.4rem 1rem', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    💌 Success Story Share Karein
+                  </button>
+                </div>
+              )}
+
               {/* Icebreaker section — shown only when no messages exist */}
               {!messages.length && (
                 <IcebreakerSection
@@ -663,6 +781,91 @@ const Chat = () => {
                 <Send size={18} style={{ color: text.trim() ? '#1A0D3D' : T.ph }} />
               </button>
             </form>
+
+            {/* Shaadi confirm "are you sure?" modal */}
+            {showShaadiModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={() => setShowShaadiModal(false)}>
+                <div onClick={e => e.stopPropagation()} style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: '1.25rem', padding: '1.5rem', maxWidth: '340px', width: '100%', textAlign: 'center' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>💍</div>
+                  <h3 style={{ color: T.text, fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Shaadi Confirm Karein</h3>
+                  <p style={{ color: T.ts, fontSize: '0.825rem', lineHeight: 1.5, marginBottom: '1.25rem' }}>
+                    Kya aap <strong style={{ color: T.gold }}>{otherUser?.name}</strong> ke saath shaadi ki taiyari confirm karna chahte hain?<br />
+                    <span style={{ fontSize: '0.75rem' }}>Dono ki sehmat hone par hi profiles archive honge.</span>
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={() => setShowShaadiModal(false)} style={{ flex: 1, background: 'none', border: `1px solid ${T.border}`, color: T.ts, borderRadius: '0.625rem', padding: '0.6rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                      Nahi
+                    </button>
+                    <button onClick={handleInitiateShaadi} style={{ flex: 1, background: T.gold, color: '#1A0D3D', border: 'none', borderRadius: '0.625rem', padding: '0.6rem', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }}>
+                      Haan, Request Bhejo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success story form modal */}
+            {showStoryModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                <div style={{ background: T.panel, border: `1px solid ${T.border}`, borderRadius: '1.25rem', padding: '1.5rem', maxWidth: '400px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+                  {storyDone ? (
+                    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🎊</div>
+                      <h3 style={{ color: T.gold, fontWeight: 'bold', marginBottom: '0.5rem' }}>Story Submit Ho Gayi!</h3>
+                      <p style={{ color: T.ts, fontSize: '0.8rem', marginBottom: '1rem' }}>Admin approve karne ke baad public ho jaayegi.</p>
+                      <button onClick={() => setShowStoryModal(false)} style={{ background: T.gold, color: '#1A0D3D', border: 'none', borderRadius: '0.5rem', padding: '0.5rem 1.5rem', fontWeight: 'bold', cursor: 'pointer' }}>
+                        Theek Hai
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                        <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>💌</div>
+                        <h3 style={{ color: T.gold, fontWeight: 'bold', fontSize: '1rem' }}>Apni Success Story Share Karein</h3>
+                        <p style={{ color: T.ts, fontSize: '0.75rem', marginTop: '3px' }}>RistaSetu se apna rishta kaise bana?</p>
+                      </div>
+                      <textarea
+                        value={storyText}
+                        onChange={e => setStoryText(e.target.value)}
+                        placeholder="RistaSetu se humara rishta kaise hua..."
+                        rows={4}
+                        style={{ width: '100%', background: T.inputBg, color: T.text, border: `1px solid ${T.border}`, borderRadius: '0.625rem', padding: '0.75rem', fontSize: '0.875rem', resize: 'vertical', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      />
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <label style={{ color: T.ts, fontSize: '0.75rem', display: 'block', marginBottom: '0.4rem' }}>
+                          Photo upload karein (optional)
+                        </label>
+                        <input type="file" accept="image/*" onChange={e => setStoryPhotoFile(e.target.files[0] || null)} style={{ color: T.ts, fontSize: '0.75rem', width: '100%' }} />
+                      </div>
+                      <div style={{ marginTop: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setStoryIsPublic(p => !p)}
+                          style={{ background: storyIsPublic ? T.gold : 'none', border: `1px solid ${T.gold}`, color: storyIsPublic ? '#1A0D3D' : T.gold, borderRadius: '999px', padding: '0.3rem 0.875rem', fontSize: '0.75rem', fontWeight: 'bold', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          {storyIsPublic ? '🌐 Public' : '🔒 Private'}
+                        </button>
+                        <span style={{ color: T.ts, fontSize: '0.72rem' }}>
+                          {storyIsPublic ? 'Success Stories page pe dikhegi' : 'Sirf aapke liye'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+                        <button onClick={() => setShowStoryModal(false)} style={{ flex: 1, background: 'none', border: `1px solid ${T.border}`, color: T.ts, borderRadius: '0.625rem', padding: '0.6rem', cursor: 'pointer', fontSize: '0.85rem' }}>
+                          Skip
+                        </button>
+                        <button
+                          onClick={handleSubmitStory}
+                          disabled={!storyText.trim() || storySubmitting}
+                          style={{ flex: 1, background: storyText.trim() && !storySubmitting ? T.gold : 'rgba(201,168,76,0.3)', color: '#1A0D3D', border: 'none', borderRadius: '0.625rem', padding: '0.6rem', cursor: storyText.trim() && !storySubmitting ? 'pointer' : 'default', fontWeight: 'bold', fontSize: '0.85rem' }}
+                        >
+                          {storySubmitting ? 'Submitting...' : 'Submit 💍'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Icebreaker full panel overlay */}
             {showIcebreaker && (

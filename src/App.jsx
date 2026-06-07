@@ -26,6 +26,7 @@ const AboutPage     = lazy(() => import('./pages/AboutPage'));
 const DisclaimerPage = lazy(() => import('./pages/DisclaimerPage'));
 const SetupPassword  = lazy(() => import('./pages/SetupPassword'));
 const FamilyDashboard = lazy(() => import('./pages/FamilyDashboard'));
+const SuccessStories  = lazy(() => import('./pages/SuccessStories'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -113,6 +114,7 @@ const App = () => {
               <Route path="/family-dashboard" element={<FamilyRoute><FamilyDashboard /></FamilyRoute>} />
 
               <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+              <Route path="/success-stories" element={<SuccessStories />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/about" element={<AboutPage />} />

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { Filter, UserPlus, Edit3, X } from 'lucide-react';
 import { calculateMatchPercentage, calculateCompatibility } from '../utils/matchUtils';
+import { calculateGunnMilan, MANGLIK_OPTIONS } from '../utils/kundaliUtils';
 import CompletenessMeter from '../components/CompletenessMeter';
 import { calculateCompleteness } from '../utils/calculateCompleteness';
 import VerifiedBadge from '../components/VerifiedBadge';
@@ -38,10 +39,10 @@ const Dashboard = () => {
 
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({
-    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: ''
+    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: '', manglik: '', minGunnMilan: ''
   });
   const [activeFilters, setActiveFilters] = useState({
-    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: ''
+    minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: '', manglik: '', minGunnMilan: ''
   });
 
 
@@ -127,6 +128,7 @@ const Dashboard = () => {
     .filter(p => {
       if (p.id === currentUser.uid) return false;
       if (p.role === 'admin') return false;
+      if (p.isActive === false) return false;
 
       if (activeFilters.minAge && p.age < parseInt(activeFilters.minAge)) return false;
       if (activeFilters.maxAge && p.age > parseInt(activeFilters.maxAge)) return false;
@@ -135,6 +137,11 @@ const Dashboard = () => {
       if (activeFilters.profession && !((p.occupation || p.profession || '').toLowerCase().includes(activeFilters.profession.toLowerCase()))) return false;
       if (activeFilters.caste && !(p.caste || '').toLowerCase().includes(activeFilters.caste.toLowerCase())) return false;
       if (activeFilters.gotra && !(p.gotra || '').toLowerCase().includes(activeFilters.gotra.toLowerCase())) return false;
+      if (activeFilters.manglik && (p.kundali?.manglik || '') !== activeFilters.manglik) return false;
+      if (activeFilters.minGunnMilan) {
+        const milan = calculateGunnMilan(userProfile, p);
+        if (!milan || milan.total < parseInt(activeFilters.minGunnMilan)) return false;
+      }
 
       return true;
     })
@@ -150,7 +157,7 @@ const Dashboard = () => {
   };
 
   const handleClearFilters = () => {
-    const clearedFilters = { minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: '' };
+    const clearedFilters = { minAge: '', maxAge: '', city: '', religion: '', profession: '', caste: '', gotra: '', manglik: '', minGunnMilan: '' };
     setFilters(clearedFilters);
     setActiveFilters(clearedFilters);
     setIsFilterModalOpen(false);
@@ -352,6 +359,39 @@ const Dashboard = () => {
                   onChange={(e) => setFilters({ ...filters, gotra: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors"
                 />
+              </div>
+
+              <div style={{ background: '#FFFBF0', border: '1px solid #D4AF37', borderRadius: '0.625rem', padding: '0.875rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                  <span style={{ fontSize: '1rem' }}>🪐</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#92610A' }}>Kundali Filters</span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Manglik Preference</label>
+                  <select
+                    value={filters.manglik}
+                    onChange={(e) => setFilters({ ...filters, manglik: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors bg-white"
+                  >
+                    <option value="">Koi bhi (Any)</option>
+                    {MANGLIK_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Gunn Milan Score</label>
+                  <select
+                    value={filters.minGunnMilan}
+                    onChange={(e) => setFilters({ ...filters, minGunnMilan: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400 transition-colors bg-white"
+                  >
+                    <option value="">Koi bhi (Any)</option>
+                    <option value="18">18+ (Sadharan)</option>
+                    <option value="24">24+ (Accha)</option>
+                    <option value="28">28+ (Uttam)</option>
+                    <option value="32">32+ (Ati Uttam)</option>
+                  </select>
+                  <p style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '3px' }}>Sirf un profiles ke liye jo Kundali data bhar chuke hain</p>
+                </div>
               </div>
             </div>
 

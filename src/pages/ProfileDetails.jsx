@@ -9,6 +9,7 @@ import { formatDate } from '../utils/formatDate';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { incrementProfileView } from '../utils/analyticsUtils';
 import CompatibilityBreakdown from '../components/CompatibilityBreakdown';
+import KundaliMilan from '../components/KundaliMilan';
 
 const ProfileDetails = () => {
   const { id } = useParams();
@@ -122,8 +123,13 @@ const ProfileDetails = () => {
             <div className="flex justify-between items-start mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold mb-1">{profile.name}</h1>
-                <p className="text-light text-lg">{profile.age} yrs{profile.height ? ` • ${profile.height}` : ''}{profile.maritalStatus ? ` • ${profile.maritalStatus}` : ''}</p>
+                <p className="text-light text-lg">{profile.age} yrs{profile.height ? ` • ${profile.height}` : ''}</p>
                 <p className="text-light text-lg">{profile.city}, {profile.state}</p>
+                {profile.maritalStatus === 'married' && (
+                  <div className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-sm font-bold" style={{ background: '#FFFBF0', border: '1.5px solid #D4AF37', color: '#92610A' }}>
+                    💍 Shaadi Ho Gayi
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <button 
@@ -188,6 +194,11 @@ const ProfileDetails = () => {
             {/* Compatibility breakdown — shown to non-owners */}
             {!isOwner && currentUserProfile && (
               <CompatibilityBreakdown user={currentUserProfile} profile={profile} />
+            )}
+
+            {/* Kundali Milan — shown to non-owners */}
+            {!isOwner && currentUserProfile && (
+              <KundaliMilan userProfile={currentUserProfile} matchProfile={profile} />
             )}
 
             <div className="flex flex-col md:flex-row gap-4 mt-8 pt-6 border-t items-center justify-between">

@@ -23,6 +23,8 @@ const notifLabel = (type, notif) => {
   if (type === 'streak')      return '🔥 Login streak milestone!';
   if (type === 'match_score') return '💚 Behtareen compatibility match!';
   if (type === 'new_match')   return `✨ abhi join kiya — ${notif?.score ?? ''}% Compatible 💚`;
+  if (type === 'shaadi_request') return '💍 shaadi confirm ki request bheji hai!';
+  if (type === 'shaadi_confirmed') return '💍 Mubarak ho! Shaadi confirm hui!';
   return 'sent you a message';
 };
 
@@ -131,6 +133,7 @@ const Navbar = () => {
                               if (notif.type === 'streak' || notif.type === 'birthday') navigate('/settings');
                               if (notif.type === 'match_score') navigate('/dashboard');
                               if (notif.type === 'new_match' && notif.matchedUserId) navigate(`/profile/${notif.matchedUserId}`);
+                              if (notif.type === 'shaadi_request' || notif.type === 'shaadi_confirmed') navigate('/chat');
                               setIsNotifOpen(false);
                             }}
                           >

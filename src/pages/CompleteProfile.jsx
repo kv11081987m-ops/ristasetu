@@ -8,6 +8,7 @@ import Button from '../components/Button';
 import { Link } from 'react-router-dom';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { runSmartMatchAlerts } from '../utils/smartMatchUtils';
+import { RASHI_LIST, NAKSHATRA_LIST, MANGLIK_OPTIONS } from '../utils/kundaliUtils';
 
 const CompleteProfile = () => {
   const { currentUser, setIsProfileComplete, setUserProfile } = useAuthContext();
@@ -28,9 +29,15 @@ const CompleteProfile = () => {
     about: ''
   });
   
+  const [kundaliData, setKundaliData] = useState({ rashi: '', nakshatra: '', manglik: '' });
   const [photoItems, setPhotoItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const handleKundaliChange = (e) => {
+    const { name, value } = e.target;
+    setKundaliData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -106,6 +113,7 @@ const CompleteProfile = () => {
       // 2. Save to Firestore
       const profileData = {
         ...formData,
+        kundali: { ...kundaliData, gotra: formData.gotra },
         photoUrl: photoUrls[0],
         photos: photoUrls,
         isProfileComplete: true,
@@ -206,7 +214,41 @@ const CompleteProfile = () => {
               <input type="text" name="gotra" value={formData.gotra} onChange={handleInputChange} className="form-input" placeholder="e.g. Bharadwaj, Kashyap, Vashisht" />
               <p className="text-[10px] text-light mt-1">Sapinda / sagotra vivah se bachne ke liye</p>
             </div>
+          </div>
 
+          {/* Kundali Vivaran Section */}
+          <div className="border rounded-xl p-4" style={{ background: '#FFFBF0', borderColor: '#D4AF37' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <span style={{ fontSize: '1.1rem' }}>🪐</span>
+              <h3 className="font-bold text-sm" style={{ color: '#92610A' }}>Kundali Vivaran (Optional)</h3>
+              <span className="text-[10px] text-gray-400 ml-auto">Kundali Milan ke liye</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Rashi (Moon Sign)</label>
+                <select name="rashi" value={kundaliData.rashi} onChange={handleKundaliChange} className="form-select text-sm">
+                  <option value="">-- Rashi Chunein --</option>
+                  {RASHI_LIST.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Nakshatra (Birth Star)</label>
+                <select name="nakshatra" value={kundaliData.nakshatra} onChange={handleKundaliChange} className="form-select text-sm">
+                  <option value="">-- Nakshatra Chunein --</option>
+                  {NAKSHATRA_LIST.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Manglik Status</label>
+                <select name="manglik" value={kundaliData.manglik} onChange={handleKundaliChange} className="form-select text-sm">
+                  <option value="">-- Chunein --</option>
+                  {MANGLIK_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-group mb-0">
               <label className="form-label">City / Shahar</label>
               <input type="text" name="city" value={formData.city} onChange={handleInputChange} required className="form-input" placeholder="e.g. Gorakhpur, Deoria" />
