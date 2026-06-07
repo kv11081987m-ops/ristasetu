@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, limit } from 'firebase/firestore';
 import { useAuthContext } from './AuthContext';
 
 const AppContext = createContext();
@@ -28,8 +28,8 @@ export const AppProvider = ({ children }) => {
         const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
         // Sort client-side to avoid composite index requirement
         docs.sort((a, b) => {
-          const ta = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0);
-          const tb = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0);
+          const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0) || (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0);
+          const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0) || (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0);
           return tb - ta;
         });
         setProfiles(docs);

@@ -59,7 +59,7 @@ const SetupPassword = () => {
         try {
           await updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true });
           setUserProfile(prev => ({ ...prev, hasPassword: true }));
-        } catch (_) { /* ignore */ }
+        } catch { /* ignore */ }
         setError('Password pehle se set tha. Settings mein "Password Change Karo" use karein.');
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('Password login enable nahi hai. Admin se contact karein: ristasetu@gmail.com');

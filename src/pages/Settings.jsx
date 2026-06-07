@@ -15,7 +15,7 @@ import {
   reauthenticateWithCredential, updatePassword,
 } from 'firebase/auth';
 import {
-  doc, deleteDoc, getDocs, updateDoc, setDoc, addDoc,
+  doc, deleteDoc, getDocs, updateDoc, setDoc,
   collection, query, where, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 import { hashPassword } from '../utils/cryptoUtils';
