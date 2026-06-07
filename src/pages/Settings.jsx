@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import ProfileAnalytics from '../components/ProfileAnalytics';
+import StreakDisplay from '../components/StreakDisplay';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { auth, db } from '../firebase/firebaseConfig';
 import {
@@ -800,6 +801,9 @@ const Settings = () => {
           </div>
         )}
       </div>
+
+      {/* Login Streak */}
+      <StreakDisplay userProfile={userProfile} />
 
       {/* Meri Analytics */}
       <div className="mb-8">

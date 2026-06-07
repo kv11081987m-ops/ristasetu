@@ -11,7 +11,10 @@ import VerifiedBadge from '../components/VerifiedBadge';
 import Button from '../components/Button';
 import BirthdayBanner from '../components/BirthdayBanner';
 import { isTodayBirthday, getBirthdayNotifKey } from '../utils/birthdayUtils';
+import StreakBanner from '../components/StreakBanner';
+import { calcAndSaveStreak, getMilestoneMessage, getStreakReward } from '../utils/streakUtils';
 import { useNotificationContext } from '../context/NotificationContext';
+import { useToastContext } from '../context/ToastContext';
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
@@ -42,6 +45,25 @@ const Dashboard = () => {
 
 
   const { sendNotification } = useNotificationContext();
+  const { showToast } = useToastContext();
+
+  // Daily login streak update — runs once per session (idempotent: no-op if already done today)
+  useEffect(() => {
+    if (!currentUser?.uid || !userProfile) return;
+    calcAndSaveStreak(currentUser.uid, userProfile).then((result) => {
+      if (!result) return;
+      if (result.wasBroken) {
+        showToast('🔥 Streak toot gayi! Naya shuru karte hain!', 'info');
+      }
+      if (result.isMilestone) {
+        const msg = getMilestoneMessage(result.newStreak);
+        sendNotification(currentUser.uid, 'streak', 'RistaSetu', null, msg).catch(() => {});
+        const reward = getStreakReward(result.newStreak);
+        if (reward) showToast(`🎉 ${msg} — ${reward.text}`, 'success');
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.uid]);
 
   // Send birthday notification once per day when it's the user's birthday
   useEffect(() => {
@@ -101,6 +123,8 @@ const Dashboard = () => {
       {userProfile?.dob && isTodayBirthday(userProfile.dob) && (
         <BirthdayBanner userName={userProfile.name} uid={currentUser.uid} />
       )}
+
+      <StreakBanner streak={userProfile?.currentStreak || 0} uid={currentUser.uid} />
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div className="flex-1">
