@@ -78,6 +78,8 @@ const Login = () => {
 
   // ── Firebase recaptcha ────────────────────────────────────────────────────
   useEffect(() => {
+    // Clear any stale instance from a previous mount before creating a new one
+    if (window.recaptchaVerifier) { window.recaptchaVerifier.clear(); window.recaptchaVerifier = null; }
     window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
       size: 'invisible', callback: () => {},
     });

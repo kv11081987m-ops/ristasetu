@@ -49,7 +49,7 @@ const Dashboard = () => {
   const { sendNotification, notifications } = useNotificationContext();
   const { showToast } = useToastContext();
 
-  // Daily login streak update — runs once per session (idempotent: no-op if already done today)
+  // Daily login streak update — idempotent (calcAndSaveStreak no-ops if already done today)
   useEffect(() => {
     if (!currentUser?.uid || !userProfile) return;
     calcAndSaveStreak(currentUser.uid, userProfile).then((result) => {
@@ -64,8 +64,7 @@ const Dashboard = () => {
         if (reward) showToast(`🎉 ${msg} — ${reward.text}`, 'success');
       }
     }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.uid]);
+  }, [currentUser?.uid, userProfile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Send birthday notification once per day when it's the user's birthday
   useEffect(() => {

@@ -39,12 +39,9 @@ export const NotificationProvider = ({ children }) => {
         }
       });
 
-      // Local sorting: Most recent first
-      const sortedNotifs = notifs.sort((a, b) => {
-        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
-        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
-        return timeB - timeA;
-      });
+      // Local sorting: Most recent first — handle both Timestamp objects and plain {seconds} objects
+      const toMs = (ts) => ts?.toMillis?.() ?? (ts?.seconds ? ts.seconds * 1000 : 0);
+      const sortedNotifs = notifs.sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
 
       setNotifications(sortedNotifs);
       setUnreadCount(unread);

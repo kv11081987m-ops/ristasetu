@@ -123,7 +123,7 @@ const ProfileDetails = () => {
             <div className="flex justify-between items-start mb-6 border-b pb-4">
               <div>
                 <h1 className="text-3xl font-bold mb-1">{profile.name}</h1>
-                <p className="text-light text-lg">{profile.age} yrs{profile.height ? ` • ${profile.height}` : ''}</p>
+                <p className="text-light text-lg">{profile.age} yrs</p>
                 <p className="text-light text-lg">{profile.city}, {profile.state}</p>
                 {profile.maritalStatus === 'married' && (
                   <div className="inline-flex items-center gap-1.5 mt-1.5 px-3 py-1 rounded-full text-sm font-bold" style={{ background: '#FFFBF0', border: '1.5px solid #D4AF37', color: '#92610A' }}>

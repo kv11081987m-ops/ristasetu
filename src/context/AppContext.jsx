@@ -119,7 +119,8 @@ export const AppProvider = ({ children }) => {
 
     const todayCount = mySent.filter(i => {
       const ts = i.createdAt?.toDate?.() ?? (i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000) : null);
-      return ts && now - ts.getTime() < msIn24h;
+      // If timestamp is unreadable, count it as recent to prevent limit bypass
+      return !ts || now - ts.getTime() < msIn24h;
     }).length;
 
     if (todayCount >= DAILY_INTEREST_LIMIT) {
