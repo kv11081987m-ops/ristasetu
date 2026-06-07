@@ -192,11 +192,13 @@ export function calculateGunnMilan(userProfile, matchProfile) {
   // Determine which is male/female
   let male, female;
   const uGender = (userProfile.gender || '').toLowerCase();
-  const mGender = (matchProfile.gender || '').toLowerCase();
+  const pGender = (matchProfile.gender || '').toLowerCase();
 
   if (uGender === 'male' || uGender === 'ladka') {
     male = userProfile; female = matchProfile;
   } else if (uGender === 'female' || uGender === 'ladki') {
+    male = matchProfile; female = userProfile;
+  } else if (pGender === 'male' || pGender === 'ladka') {
     male = matchProfile; female = userProfile;
   } else {
     male = userProfile; female = matchProfile;

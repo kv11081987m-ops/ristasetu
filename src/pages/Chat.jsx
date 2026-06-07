@@ -7,7 +7,7 @@ import { MessageSquare, Home, MoreVertical, ArrowLeft, Smile, Send, X } from 'lu
 import { db } from '../firebase/firebaseConfig';
 import { collection, onSnapshot, orderBy, query, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { ICEBREAKER_CATEGORIES, getSmartSuggestions } from '../utils/icebreakerQuestions';
-import { initiateShaadi, confirmShaadi, declineShaadi, submitSuccessStory } from '../utils/shaadiUtils';
+import { initiateShaadi, confirmShaadi, declineShaadi, submitSuccessStory, selfArchive } from '../utils/shaadiUtils';
 import { uploadToCloudinary } from '../utils/uploadUtils';
 
 const T = {
@@ -375,11 +375,23 @@ const Chat = () => {
 
   // Subscribe to shaadi_request for active chat
   useEffect(() => {
-    if (!activeChatId) { setShaadiRequest(null); return; }
+    if (!activeChatId) {
+      setShaadiRequest(prev => prev ? null : prev); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
     return onSnapshot(doc(db, 'shaadi_requests', activeChatId), snap => {
       setShaadiRequest(snap.exists() ? { id: snap.id, ...snap.data() } : null);
     });
   }, [activeChatId]);
+
+  // Auto-archive own profile when shaadi is confirmed (handles the initiator side)
+  useEffect(() => {
+    if (shaadiRequest?.status !== 'confirmed') return;
+    if (!currentUser?.uid || !otherUser?.id) return;
+    if (userProfile?.maritalStatus === 'married') return; // already done
+    selfArchive(currentUser.uid, otherUser.id).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shaadiRequest?.status, currentUser?.uid, otherUser?.id]);
 
   // Subscribe to messages
   useEffect(() => {
@@ -429,6 +441,8 @@ const Chat = () => {
     setActiveChatId(id);
     setReadChatIds(prev => new Set([...prev, id]));
     setShowIcebreaker(false);
+    setShowShaadiModal(false);
+    setShowStoryModal(false);
     setTimeout(() => inputRef.current?.focus(), 150);
   };
 
@@ -646,7 +660,7 @@ const Chat = () => {
                 <div style={{ margin: '0.75rem 0', background: 'rgba(212,175,55,0.1)', border: '1.5px solid rgba(212,175,55,0.5)', borderRadius: '0.875rem', padding: '1rem' }}>
                   <div style={{ textAlign: 'center', marginBottom: '0.75rem' }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>💍</div>
-                    <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '3px' }}>{otherUser?.name} ne shaadi confirm ki request bheji hai!</div>
+                    <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.9rem', marginBottom: '3px' }}>{otherUser?.name || 'Unka saathi'} ne shaadi confirm ki request bheji hai!</div>
                     <div style={{ color: T.ts, fontSize: '0.75rem' }}>Kya aap sehmat hain?</div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem' }}>

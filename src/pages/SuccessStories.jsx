@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Heart } from 'lucide-react';
@@ -7,23 +7,25 @@ import { ShieldCheck, Heart } from 'lucide-react';
 const SuccessStories = () => {
   const [stories, setStories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [totalConfirmed, setTotalConfirmed] = useState(0);
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const pubQ = query(
+        // No orderBy — avoids composite index requirement. Sort client-side.
+        const q = query(
           collection(db, 'success_stories'),
           where('status', '==', 'approved'),
-          where('isPublic', '==', true),
-          orderBy('approvedAt', 'desc')
+          where('isPublic', '==', true)
         );
-        const pubSnap = await getDocs(pubQ);
-        setStories(pubSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-
-        const allQ = query(collection(db, 'success_stories'), where('status', '==', 'approved'));
-        const allSnap = await getDocs(allQ);
-        setTotalConfirmed(allSnap.size);
+        const snap = await getDocs(q);
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.approvedAt?.toMillis?.() ?? 0;
+            const tb = b.approvedAt?.toMillis?.() ?? 0;
+            return tb - ta;
+          });
+        setStories(list);
       } catch (e) {
         console.error(e);
       } finally {
@@ -40,9 +42,9 @@ const SuccessStories = () => {
         <div style={{ fontSize: '2.75rem', marginBottom: '0.5rem' }}>💍</div>
         <h1 className="text-3xl font-bold text-gray-800 mb-2">RistaSetu ke Rishtey</h1>
         <p className="text-gray-500 text-sm">Inhi logo ne yahan se apna jeevan saathi paya</p>
-        {totalConfirmed > 0 && (
+        {stories.length > 0 && (
           <div className="inline-block mt-4 bg-red-50 text-red-600 font-bold px-5 py-2 rounded-full border border-red-200 text-sm">
-            🎊 {totalConfirmed} Rishtey RistaSetu se Hue!
+            🎊 {stories.length} Rishtey RistaSetu se Hue!
           </div>
         )}
       </div>

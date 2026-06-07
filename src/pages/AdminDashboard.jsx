@@ -47,9 +47,17 @@ const AdminDashboard = () => {
   useEffect(() => {
     const fetchStories = async () => {
       try {
-        const q = query(collection(db, 'success_stories'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        // No orderBy — avoids composite index requirement. Sort client-side.
+        const q = query(collection(db, 'success_stories'), where('status', '==', 'pending'));
         const snap = await getDocs(q);
-        setPendingStories(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const list = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => {
+            const ta = a.createdAt?.toMillis?.() ?? 0;
+            const tb = b.createdAt?.toMillis?.() ?? 0;
+            return tb - ta;
+          });
+        setPendingStories(list);
       } catch (e) {
         console.error('Stories fetch error:', e);
       } finally {
