@@ -3,9 +3,10 @@ import { useAppContext } from '../context/AppContext';
 import { useAuthContext } from '../context/AuthContext';
 import { useNotificationContext } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Home, MoreVertical, ArrowLeft, Smile, Send } from 'lucide-react';
+import { MessageSquare, Home, MoreVertical, ArrowLeft, Smile, Send, X } from 'lucide-react';
 import { db } from '../firebase/firebaseConfig';
 import { collection, onSnapshot, orderBy, query, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { ICEBREAKER_CATEGORIES, getSmartSuggestions } from '../utils/icebreakerQuestions';
 
 const T = {
   bg: '#2D1B5E',
@@ -82,6 +83,237 @@ const Avatar = ({ person, size = 48, fs = '1rem' }) => (
   </div>
 );
 
+// ── Icebreaker full-screen panel ──────────────────────────────────────────────
+const IcebreakerPanel = ({ onSelect, onClose, myProfile, otherUser }) => {
+  const smartSuggestions = getSmartSuggestions(myProfile, otherUser);
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#1A0D3D',
+          border: `1px solid ${T.border}`,
+          borderRadius: '1.25rem 1.25rem 0 0',
+          width: '100%',
+          maxWidth: '640px',
+          maxHeight: '80vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Panel header */}
+        <div style={{
+          padding: '1rem 1.25rem 0.875rem',
+          borderBottom: `1px solid ${T.border}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '1rem' }}>
+              💌 Icebreaker Sawaal
+            </div>
+            <div style={{ color: T.ts, fontSize: '0.75rem', marginTop: '2px' }}>
+              Koi bhi sawaal click karein — seedha message box mein jayega
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.ph, padding: '0.25rem', display: 'flex' }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ overflowY: 'auto', padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Smart suggestions */}
+          {smartSuggestions.length > 0 && (
+            <div>
+              <div style={{ color: T.gold, fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.08em', marginBottom: '0.6rem' }}>
+                ✨ AAPKE LIYE KHAAS
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {smartSuggestions.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onSelect(q)}
+                    style={{
+                      background: 'rgba(201,168,76,0.08)',
+                      border: `1px solid rgba(201,168,76,0.3)`,
+                      borderRadius: '0.625rem',
+                      padding: '0.6rem 0.875rem',
+                      color: T.text,
+                      fontSize: '0.85rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      lineHeight: 1.4,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.16)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(201,168,76,0.08)'; }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* All categories */}
+          {ICEBREAKER_CATEGORIES.map(cat => (
+            <div key={cat.id}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                <span style={{ fontSize: '1rem' }}>{cat.emoji}</span>
+                <span style={{ color: cat.color, fontSize: '0.7rem', fontWeight: 'bold', letterSpacing: '0.08em' }}>
+                  {cat.label.toUpperCase()}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {cat.questions.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onSelect(q)}
+                    style={{
+                      background: cat.bg,
+                      border: `1px solid ${cat.color}30`,
+                      borderRadius: '0.625rem',
+                      padding: '0.55rem 0.875rem',
+                      color: T.text,
+                      fontSize: '0.825rem',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      lineHeight: 1.4,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = cat.color + '20'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = cat.bg; }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{ height: '0.5rem' }} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Inline icebreaker section (shown when 0 messages) ────────────────────────
+const IcebreakerSection = ({ otherUser, myProfile, onSelect, onShowAll }) => {
+  const suggestions = getSmartSuggestions(myProfile, otherUser);
+  // Picked once at mount — stable across re-renders
+  const [quickQ] = useState(() => [
+    ICEBREAKER_CATEGORIES[0].questions[Math.floor(Math.random() * 5)],
+    ICEBREAKER_CATEGORIES[3].questions[Math.floor(Math.random() * 5)],
+  ]);
+
+  return (
+    <div style={{
+      margin: '1rem 0',
+      background: 'rgba(201,168,76,0.06)',
+      border: `1px solid rgba(201,168,76,0.2)`,
+      borderRadius: '1rem',
+      padding: '1.25rem',
+    }}>
+      <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+        <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>💌</div>
+        <div style={{ color: T.gold, fontWeight: 'bold', fontSize: '0.95rem' }}>
+          Naya Rishta, Nai Shuruaat!
+        </div>
+        <div style={{ color: T.ts, fontSize: '0.775rem', marginTop: '3px' }}>
+          {otherUser?.name || 'Is shaqs'} ko pehla message bhejne mein madad chahiye?
+        </div>
+      </div>
+
+      {/* Smart suggestions */}
+      {suggestions.length > 0 && (
+        <div style={{ marginBottom: '0.75rem' }}>
+          <div style={{ color: T.gold, fontSize: '0.65rem', fontWeight: 'bold', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+            ✨ AAPKE LIYE
+          </div>
+          {suggestions.map((q, i) => (
+            <button
+              key={i}
+              onClick={() => onSelect(q)}
+              style={{
+                display: 'block', width: '100%',
+                background: 'rgba(201,168,76,0.1)',
+                border: `1px solid rgba(201,168,76,0.25)`,
+                borderRadius: '0.5rem',
+                padding: '0.5rem 0.75rem',
+                color: T.text,
+                fontSize: '0.8rem',
+                textAlign: 'left',
+                cursor: 'pointer',
+                marginBottom: '0.4rem',
+                lineHeight: 1.4,
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Quick starters */}
+      <div style={{ marginBottom: '0.875rem' }}>
+        <div style={{ color: T.ph, fontSize: '0.65rem', fontWeight: 'bold', letterSpacing: '0.06em', marginBottom: '0.4rem' }}>
+          SAWAAL SE SHURU KAREIN
+        </div>
+        {quickQ.map((q, i) => (
+          <button
+            key={i}
+            onClick={() => onSelect(q)}
+            style={{
+              display: 'block', width: '100%',
+              background: T.received,
+              border: `1px solid ${T.recvBorder}`,
+              borderRadius: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              color: T.text,
+              fontSize: '0.8rem',
+              textAlign: 'left',
+              cursor: 'pointer',
+              marginBottom: '0.4rem',
+              lineHeight: 1.4,
+            }}
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={onShowAll}
+        style={{
+          display: 'block', width: '100%',
+          background: 'none',
+          border: `1px solid ${T.border}`,
+          borderRadius: '0.5rem',
+          padding: '0.5rem',
+          color: T.gold,
+          fontSize: '0.8rem',
+          cursor: 'pointer',
+          fontWeight: 'bold',
+        }}
+      >
+        Aur sawaal dekhein →
+      </button>
+    </div>
+  );
+};
+
 const Chat = () => {
   const { chats, profiles, sendMessage } = useAppContext();
   const { currentUser, userProfile } = useAuthContext();
@@ -93,6 +325,7 @@ const Chat = () => {
   const [text, setText] = useState('');
   const [fetchedProfiles, setFetchedProfiles] = useState({});
   const [readChatIds, setReadChatIds] = useState(new Set());
+  const [showIcebreaker, setShowIcebreaker] = useState(false);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -177,7 +410,14 @@ const Chat = () => {
   const handleSelectChat = (id) => {
     setActiveChatId(id);
     setReadChatIds(prev => new Set([...prev, id]));
+    setShowIcebreaker(false);
     setTimeout(() => inputRef.current?.focus(), 150);
+  };
+
+  const handleIcebreakerSelect = (question) => {
+    setText(question);
+    setShowIcebreaker(false);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleSend = async (e) => {
@@ -312,10 +552,14 @@ const Chat = () => {
 
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {/* Icebreaker section — shown only when no messages exist */}
               {!messages.length && (
-                <div style={{ textAlign: 'center', color: T.ts, margin: '2rem 0', fontSize: '0.875rem' }}>
-                  {otherUser?.name || 'User'} ko pehla message bhejein!
-                </div>
+                <IcebreakerSection
+                  otherUser={otherUser}
+                  myProfile={userProfile}
+                  onSelect={handleIcebreakerSelect}
+                  onShowAll={() => setShowIcebreaker(true)}
+                />
               )}
               {grouped.map(item => {
                 if (item.type === 'div') {
@@ -360,6 +604,27 @@ const Chat = () => {
               <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.ph, padding: '0.25rem', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 <Smile size={22} />
               </button>
+              {/* Icebreaker 💌 button */}
+              <button
+                type="button"
+                onClick={() => setShowIcebreaker(true)}
+                title="Icebreaker sawaal"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.2rem',
+                  lineHeight: 1,
+                  padding: '0.2rem',
+                  flexShrink: 0,
+                  opacity: 0.85,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '0.85'; }}
+              >
+                💌
+              </button>
               <input
                 ref={inputRef}
                 type="text"
@@ -398,6 +663,16 @@ const Chat = () => {
                 <Send size={18} style={{ color: text.trim() ? '#1A0D3D' : T.ph }} />
               </button>
             </form>
+
+            {/* Icebreaker full panel overlay */}
+            {showIcebreaker && (
+              <IcebreakerPanel
+                onSelect={handleIcebreakerSelect}
+                onClose={() => setShowIcebreaker(false)}
+                myProfile={userProfile}
+                otherUser={otherUser}
+              />
+            )}
           </>
         )}
       </div>
