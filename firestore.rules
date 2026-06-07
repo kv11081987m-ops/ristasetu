@@ -154,6 +154,23 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
     }
 
+    // ── smart_match_sent ──────────────────────────────────────────────────
+    // Tracks which existing-user/new-user pairs have been notified.
+    // Doc ID: {existingUserId}_{newUserId} — immutable once created.
+    match /smart_match_sent/{docId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if false;
+    }
+
+    // ── smart_match_daily ─────────────────────────────────────────────────
+    // Per-user daily notification counter — prevents spam.
+    // Doc ID: {userId}_{YYYY-MM-DD}
+    match /smart_match_daily/{docId} {
+      allow read: if isAuth();
+      allow write: if isAuth();
+    }
+
     // ── analytics ─────────────────────────────────────────────────────────
     // Only the profile owner can read their own analytics.
     // Any authenticated user can create/update — but non-owners may only

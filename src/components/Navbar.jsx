@@ -16,12 +16,13 @@ const timeAgo = (ts) => {
   return `${Math.floor(diff / 86400000)}d ago`;
 };
 
-const notifLabel = (type) => {
+const notifLabel = (type, notif) => {
   if (type === 'interest') return 'sent you an interest';
   if (type === 'accepted') return 'accepted your interest';
   if (type === 'birthday') return '🎂 Janam Din ki Shubhkamnayein!';
   if (type === 'streak')      return '🔥 Login streak milestone!';
   if (type === 'match_score') return '💚 Behtareen compatibility match!';
+  if (type === 'new_match')   return `✨ abhi join kiya — ${notif?.score ?? ''}% Compatible 💚`;
   return 'sent you a message';
 };
 
@@ -129,6 +130,7 @@ const Navbar = () => {
                               if (notif.type === 'interest') navigate('/interests');
                               if (notif.type === 'streak' || notif.type === 'birthday') navigate('/settings');
                               if (notif.type === 'match_score') navigate('/dashboard');
+                              if (notif.type === 'new_match' && notif.matchedUserId) navigate(`/profile/${notif.matchedUserId}`);
                               setIsNotifOpen(false);
                             }}
                           >
@@ -140,7 +142,7 @@ const Navbar = () => {
                             <div style={{ flex: 1, overflow: 'hidden' }}>
                               <p className="text-sm text-gray-800 leading-snug">
                                 <span className="font-bold">{notif.fromName}</span>{' '}
-                                {notifLabel(notif.type)}
+                                {notifLabel(notif.type, notif)}
                               </p>
                               {notif.message && (
                                 <p className="text-xs text-gray-500 mt-0.5 truncate">{notif.message}</p>

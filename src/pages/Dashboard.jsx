@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import ProfileCard from '../components/ProfileCard';
 import { useAppContext } from '../context/AppContext';
@@ -15,6 +15,7 @@ import StreakBanner from '../components/StreakBanner';
 import { calcAndSaveStreak, getMilestoneMessage, getStreakReward } from '../utils/streakUtils';
 import { useNotificationContext } from '../context/NotificationContext';
 import { useToastContext } from '../context/ToastContext';
+import NewMatchBanner from '../components/NewMatchBanner';
 
 const SkeletonCard = () => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
@@ -44,7 +45,7 @@ const Dashboard = () => {
   });
 
 
-  const { sendNotification } = useNotificationContext();
+  const { sendNotification, notifications } = useNotificationContext();
   const { showToast } = useToastContext();
 
   // Daily login streak update — runs once per session (idempotent: no-op if already done today)
@@ -105,6 +106,20 @@ const Dashboard = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.uid, profiles.length]);
 
+  // Captured once at mount — stable reference for 24h window check
+  const [mountTime] = useState(() => Date.now());
+
+  // Best unread new_match notification within 24 hours of the page load
+  const newMatchBanner = useMemo(() =>
+    notifications
+      .filter(n => n.type === 'new_match' && n.status === 'unread')
+      .filter(n => {
+        const ms = n.createdAt?.toMillis?.() ?? (n.createdAt?.seconds ? n.createdAt.seconds * 1000 : 0);
+        return ms > 0 && mountTime - ms < 24 * 60 * 60 * 1000;
+      })
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0] ?? null
+  , [notifications, mountTime]);
+
   if (!currentUser) return null;
 
   // Recommendations and filtering logic
@@ -143,6 +158,8 @@ const Dashboard = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 page-transition">
+      {newMatchBanner && <NewMatchBanner notification={newMatchBanner} />}
+
       {userProfile?.dob && isTodayBirthday(userProfile.dob) && (
         <BirthdayBanner userName={userProfile.name} uid={currentUser.uid} />
       )}

@@ -4,7 +4,7 @@ import Button from '../components/Button';
 import {
   LogOut, User, ChevronRight, Shield, Trash2, HelpCircle, ExternalLink,
   AlertTriangle, X, Loader2, Lock, Copy, Check, Eye, EyeOff, Camera,
-  FileText, Users, UserPlus, Trash, Zap,
+  FileText, Users, UserPlus, Trash, Zap, Bell,
 } from 'lucide-react';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import ProfileAnalytics from '../components/ProfileAnalytics';
@@ -636,6 +636,22 @@ const Settings = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPhotosModal, setShowPhotosModal] = useState(false);
   const [copied, setCopied] = useState(false);
+  // null = follow userProfile value; non-null = user just toggled (optimistic)
+  const [smartMatchOverride, setSmartMatchOverride] = useState(null);
+  const smartMatchAlerts = smartMatchOverride !== null
+    ? smartMatchOverride
+    : (userProfile?.smartMatchAlerts !== false);
+
+  const handleSmartMatchToggle = async () => {
+    if (!currentUser?.uid) return;
+    const newVal = !smartMatchAlerts;
+    setSmartMatchOverride(newVal);
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), { smartMatchAlerts: newVal });
+    } catch {
+      setSmartMatchOverride(!newVal);
+    }
+  };
 
   const handleCopyId = () => {
     if (!userProfile?.ristaSetuId) return;
@@ -859,6 +875,33 @@ const Settings = () => {
             }
             to="/kyc"
           />
+        </div>
+
+        {/* Notifications Section */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-4 px-2">Notifications</h4>
+          <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-gray-100 shadow-sm mb-3">
+            <div className="flex items-center gap-4">
+              <div className="p-2 rounded-lg bg-green-50">
+                <Bell size={20} className="text-green-600" />
+              </div>
+              <div>
+                <p className="font-bold text-sm text-gray-800">Naye Match Alerts</p>
+                <p className="text-xs text-gray-500">Naya compatible user join kare toh notify karo</p>
+              </div>
+            </div>
+            <button
+              onClick={handleSmartMatchToggle}
+              aria-label="Toggle smart match alerts"
+              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none border-none cursor-pointer"
+              style={{ background: smartMatchAlerts ? '#16A34A' : '#D1D5DB' }}
+            >
+              <span
+                className="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform"
+                style={{ transform: smartMatchAlerts ? 'translateX(24px)' : 'translateX(4px)' }}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Kisne Dekha — locked for free users */}

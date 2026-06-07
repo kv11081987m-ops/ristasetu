@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { useAuthContext } from '../context/AuthContext';
+import { useAppContext } from '../context/AppContext';
 import Button from '../components/Button';
 import { Link } from 'react-router-dom';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
+import { runSmartMatchAlerts } from '../utils/smartMatchUtils';
 
 const CompleteProfile = () => {
   const { currentUser, setIsProfileComplete, setUserProfile } = useAuthContext();
+  const { profiles } = useAppContext();
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState({
@@ -120,7 +123,10 @@ const CompleteProfile = () => {
       setUserProfile(profileData);
       setIsProfileComplete(true);
 
-      // 4. Redirect
+      // 4. Smart match alerts — fire and forget, don't block navigation
+      runSmartMatchAlerts({ ...profileData, id: currentUser.uid }, profiles).catch(() => {});
+
+      // 5. Redirect
       navigate('/dashboard');
     } catch (err) {
       console.error("CompleteProfile submit error:", err.code || err.message);
