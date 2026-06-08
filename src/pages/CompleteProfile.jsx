@@ -34,7 +34,11 @@ const CompleteProfile = () => {
     nakshatra: userProfile?.nakshatra || '',
     manglik:   userProfile?.manglik   || '',
   }));
-  const [photoItems, setPhotoItems] = useState([]);
+  // Pre-fill existing photos so user doesn't have to re-upload on edit
+  const [photoItems, setPhotoItems] = useState(() => {
+    const existing = userProfile?.photos || (userProfile?.photoUrl ? [userProfile.photoUrl] : []);
+    return existing.map(url => ({ url, preview: url, isExisting: true }));
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -111,10 +115,12 @@ const CompleteProfile = () => {
     setError('');
 
     try {
-      // 1. Upload photos to Cloudinary
-      const photoUrls = await Promise.all(photoItems.map(item => uploadToCloudinary(item.file)));
+      // 1. Upload only NEW photos; existing ones already have Cloudinary URLs
+      const photoUrls = await Promise.all(
+        photoItems.map(item => item.isExisting ? Promise.resolve(item.url) : uploadToCloudinary(item.file))
+      );
 
-      // 2. Save to Firestore
+      // 2. Save to Firestore — never overwrite kycStatus, isPremium, premiumPlan, or createdAt
       const profileData = {
         ...formData,
         kundali: { ...kundaliData, gotra: formData.gotra },
@@ -123,10 +129,10 @@ const CompleteProfile = () => {
         isProfileComplete: true,
         uid: currentUser.uid,
         email: currentUser.email,
-        kycStatus: 'not_started',
-        isPremium: false,
-        premiumPlan: 'none',
-        createdAt: serverTimestamp()
+        // First-time defaults only — don't clobber on edit
+        ...(!userProfile?.kycStatus   && { kycStatus: 'not_started' }),
+        ...(!userProfile?.createdAt   && { createdAt: serverTimestamp() }),
+        ...(userProfile?.isPremium === undefined && { isPremium: false, premiumPlan: 'none' }),
       };
 
       await setDoc(doc(db, 'users', currentUser.uid), profileData, { merge: true });
