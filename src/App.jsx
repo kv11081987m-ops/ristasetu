@@ -41,9 +41,6 @@ const ProtectedRoute = ({ children }) => {
   if (!currentUser) return <Navigate to="/splash" replace />;
   // Family accounts should stay in their own dashboard
   if (familyMode) return <Navigate to="/family-dashboard" replace />;
-  if (currentUser && isProfileComplete && location.pathname === '/complete-profile') {
-    return <Navigate to="/dashboard" replace />;
-  }
   return children;
 };
 

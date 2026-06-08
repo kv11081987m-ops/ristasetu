@@ -11,25 +11,29 @@ import { runSmartMatchAlerts } from '../utils/smartMatchUtils';
 import { RASHI_LIST, NAKSHATRA_LIST, MANGLIK_OPTIONS } from '../utils/kundaliUtils';
 
 const CompleteProfile = () => {
-  const { currentUser, setIsProfileComplete, setUserProfile } = useAuthContext();
+  const { currentUser, userProfile, setIsProfileComplete, setUserProfile } = useAuthContext();
   const { profiles } = useAppContext();
   const navigate = useNavigate();
   
-  const [formData, setFormData] = useState({
-    name: '',
-    dob: '',
-    age: '',
-    gender: 'Male',
-    religion: 'Hindu',
-    caste: '',
-    gotra: '',
-    city: '',
-    state: 'Uttar Pradesh',
-    occupation: '',
-    about: ''
-  });
-  
-  const [kundaliData, setKundaliData] = useState({ rashi: '', nakshatra: '', manglik: '' });
+  const [formData, setFormData] = useState(() => ({
+    name:       userProfile?.name       || '',
+    dob:        userProfile?.dob        || '',
+    age:        userProfile?.age        || '',
+    gender:     userProfile?.gender     || 'Male',
+    religion:   userProfile?.religion   || 'Hindu',
+    caste:      userProfile?.caste      || '',
+    gotra:      userProfile?.gotra      || '',
+    city:       userProfile?.city       || '',
+    state:      userProfile?.state      || 'Uttar Pradesh',
+    occupation: userProfile?.occupation || userProfile?.profession || '',
+    about:      userProfile?.about      || '',
+  }));
+
+  const [kundaliData, setKundaliData] = useState(() => ({
+    rashi:     userProfile?.rashi     || '',
+    nakshatra: userProfile?.nakshatra || '',
+    manglik:   userProfile?.manglik   || '',
+  }));
   const [photoItems, setPhotoItems] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');

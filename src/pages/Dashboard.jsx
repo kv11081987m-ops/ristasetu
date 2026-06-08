@@ -204,7 +204,7 @@ const Dashboard = () => {
             </Link>
           ) : (
             <Link
-              to="/settings"
+              to="/complete-profile"
               className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-4 py-2 rounded-md hover:bg-red-50 font-semibold transition-colors shadow-sm"
             >
               <Edit3 size={18} />
