@@ -12,12 +12,12 @@ import StreakDisplay from '../components/StreakDisplay';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { auth, db, functions } from '../firebase/firebaseConfig';
 import {
-  signOut, deleteUser,
+  signOut,
   EmailAuthProvider, linkWithCredential,
   reauthenticateWithCredential, updatePassword,
 } from 'firebase/auth';
 import {
-  doc, deleteDoc, getDocs, updateDoc, setDoc,
+  doc, deleteDoc, updateDoc, setDoc,
   collection, query, where, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -676,65 +676,20 @@ const Settings = () => {
     setIsDeleting(true);
     setDeleteError('');
 
-    const uid = currentUser.uid;
-
     try {
-      // 1. Delete all interests (sent + received)
-      const [sentSnap, receivedSnap] = await Promise.all([
-        getDocs(query(collection(db, 'interests'), where('senderId', '==', uid))),
-        getDocs(query(collection(db, 'interests'), where('receiverId', '==', uid))),
-      ]);
-      const interestDeletions = [
-        ...sentSnap.docs.map(d => deleteDoc(d.ref)),
-        ...receivedSnap.docs.map(d => deleteDoc(d.ref)),
-      ];
-
-      // 2. Delete shortlists
-      const shortlistSnap = await getDocs(
-        query(collection(db, 'shortlists'), where('userId', '==', uid))
-      );
-
-      // 3. Delete notifications
-      const notifSnap = await getDocs(
-        query(collection(db, 'notifications'), where('userId', '==', uid))
-      );
-
-      // 4. Delete chats (and their messages subcollections)
-      const chatsSnap = await getDocs(
-        query(collection(db, 'chats'), where('participants', 'array-contains', uid))
-      );
-      const chatDeletions = [];
-      for (const chatDoc of chatsSnap.docs) {
-        const msgsSnap = await getDocs(collection(db, 'chats', chatDoc.id, 'messages'));
-        msgsSnap.docs.forEach(m => chatDeletions.push(deleteDoc(m.ref)));
-        chatDeletions.push(deleteDoc(chatDoc.ref));
-      }
-
-      await Promise.all([
-        ...interestDeletions,
-        ...shortlistSnap.docs.map(d => deleteDoc(d.ref)),
-        ...notifSnap.docs.map(d => deleteDoc(d.ref)),
-        ...chatDeletions,
-      ]);
-
-      // 4. Delete Firestore profile document
-      await deleteDoc(doc(db, 'users', uid));
-
-      // 5. Delete Firebase Auth user (must be last — after this, rules won't work)
-      await deleteUser(currentUser);
-
-      // Auth state change will auto-redirect via AuthContext
+      // Deletion runs entirely server-side (Admin SDK) — users/{uid},
+      // chats, and chat messages are admin-only / delete:false in
+      // firestore.rules by design (never loosened for this), so the
+      // client could never have finished this itself. The function also
+      // deletes the Firebase Auth account, which has no "recent login"
+      // requirement server-side (unlike the client SDK's deleteUser()).
+      const deleteFn = httpsCallable(functions, 'deleteMyAccount');
+      await deleteFn();
+      await signOut(auth);
       navigate('/splash');
-
     } catch (err) {
-      if (err.code === 'auth/requires-recent-login') {
-        setDeleteError(
-          'Security check failed. Please log out and log back in, then try deleting again.'
-        );
-      } else {
-        setDeleteError('Something went wrong. Please try again.');
-        console.error('Delete account error:', err);
-      }
+      setDeleteError('Something went wrong. Please try again.');
+      console.error('Delete account error:', err);
     } finally {
       setIsDeleting(false);
     }

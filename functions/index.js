@@ -305,6 +305,124 @@ exports.getKycDocumentUrl = onCall({ secrets: CLOUDINARY_SECRETS }, async (reque
   return { url, expiresIn: 600 };
 });
 
+// Best-effort: extracts a Cloudinary public_id (folder/name, no extension,
+// no version) from a stored secure_url for the unsigned profile-photo
+// preset. Returns null rather than throwing on anything unexpected — a
+// failed extraction just means that one photo doesn't get cleaned up from
+// Cloudinary, never a reason to abort account deletion.
+const publicIdFromUrl = (url) => {
+  const match = typeof url === 'string' && url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+$/);
+  return match ? match[1] : null;
+};
+
+// ── Delete my account — the only path that can remove a users/{uid} doc,
+// a chat, or a chat message. Those were already admin-only / delete:false
+// in firestore.rules before any of this session's changes (confirmed
+// against the pre-session commit), so the client-side delete flow in
+// Settings.jsx was never actually capable of finishing — it just hadn't
+// been exercised end-to-end with real chat/interest data until now. Admin
+// SDK bypasses rules entirely, so this is the only way self-service
+// account deletion can ever work short of loosening rules meant to stay
+// tight (declined — that's Option B, explicitly not preferred).
+exports.deleteMyAccount = onCall(
+  { secrets: CLOUDINARY_SECRETS, timeoutSeconds: 120 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+    const uid = request.auth.uid;
+
+    const userRef = db.collection('users').doc(uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.data() || {};
+
+    // 1. Cloudinary cleanup — best-effort only, must never block deletion.
+    try {
+      configureCloudinary();
+
+      const kycSnap = await userRef.collection('private').doc('kyc').get();
+      const kycPublicId = kycSnap.data()?.documentPublicId;
+      if (kycPublicId) {
+        await cloudinary.uploader
+          .destroy(kycPublicId, { type: 'authenticated', resource_type: 'image' })
+          .catch((err) => console.error('KYC Cloudinary cleanup failed:', err));
+      }
+
+      const photoUrls = userData.photos?.length ? userData.photos : (userData.photoUrl ? [userData.photoUrl] : []);
+      for (const url of photoUrls) {
+        const publicId = publicIdFromUrl(url);
+        if (!publicId) continue;
+        await cloudinary.uploader
+          .destroy(publicId, { resource_type: 'image' })
+          .catch((err) => console.error('Photo Cloudinary cleanup failed:', err));
+      }
+    } catch (err) {
+      console.error('Cloudinary cleanup failed (non-blocking):', err);
+    }
+
+    // 2. Firestore cleanup — BulkWriter handles rate limiting/retries and
+    // has no 500-op atomic-batch ceiling, which matters here since a long
+    // chat history can mean thousands of message docs to delete.
+    const bulk = db.bulkWriter();
+    bulk.onWriteError((err) => {
+      console.error('deleteMyAccount bulkWriter error:', err.path, err.message);
+      return err.failedAttempts < 3; // retry transient failures a few times, then give up on that doc
+    });
+
+    bulk.delete(userRef.collection('private').doc('contact'));
+    bulk.delete(userRef.collection('private').doc('kyc'));
+    bulk.delete(db.collection('analytics').doc(uid));
+    bulk.delete(db.collection('biodata_downloads').doc(uid));
+    if (userData.ristaSetuId) {
+      bulk.delete(db.collection('password_index').doc(String(userData.ristaSetuId).toUpperCase()));
+    }
+
+    const [
+      sentInterests, receivedInterests,
+      ownShortlists, shortlistedByOthers,
+      receivedNotifs,
+      chats,
+      smartDaily, smartSentAsExisting, smartSentAsNew,
+      shaadiInitiated, shaadiReceived,
+      familyLinks,
+    ] = await Promise.all([
+      db.collection('interests').where('senderId', '==', uid).get(),
+      db.collection('interests').where('receiverId', '==', uid).get(),
+      db.collection('shortlists').where('userId', '==', uid).get(),
+      db.collection('shortlists').where('profileId', '==', uid).get(),
+      db.collection('notifications').where('userId', '==', uid).get(),
+      db.collection('chats').where('participants', 'array-contains', uid).get(),
+      db.collection('smart_match_daily').where('userId', '==', uid).get(),
+      db.collection('smart_match_sent').where('existingUserId', '==', uid).get(),
+      db.collection('smart_match_sent').where('newUserId', '==', uid).get(),
+      db.collection('shaadi_requests').where('initiatorId', '==', uid).get(),
+      db.collection('shaadi_requests').where('receiverId', '==', uid).get(),
+      db.collection('family_access').where('linkedUserId', '==', uid).get(),
+    ]);
+
+    [
+      sentInterests, receivedInterests, ownShortlists, shortlistedByOthers,
+      receivedNotifs, smartDaily, smartSentAsExisting, smartSentAsNew,
+      shaadiInitiated, shaadiReceived, familyLinks,
+    ].forEach((snap) => snap.docs.forEach((d) => bulk.delete(d.ref)));
+
+    for (const chatDoc of chats.docs) {
+      const msgsSnap = await chatDoc.ref.collection('messages').get();
+      msgsSnap.docs.forEach((m) => bulk.delete(m.ref));
+      bulk.delete(chatDoc.ref);
+    }
+
+    bulk.delete(userRef);
+    await bulk.close();
+
+    // 3. Delete the Firebase Auth account itself. Admin SDK deletion has
+    // no "recent login" requirement (that's a client-SDK-only restriction),
+    // so this also fixes the auth/requires-recent-login dead end the old
+    // client-side deleteUser() call could hit.
+    await getAuth().deleteUser(uid);
+
+    return { ok: true };
+  }
+);
+
 // ── Shaadi confirmed → archive both profiles server-side ──────────────────
 // Archiving used to depend on the initiator's client being open in that
 // specific chat (a useEffect watching the live snapshot). If they weren't,
