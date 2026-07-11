@@ -5,7 +5,7 @@ import { useToastContext } from '../context/ToastContext';
 import { db, functions } from '../firebase/firebaseConfig';
 import { doc, setDoc, updateDoc, addDoc, collection, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { validateImageFile, uploadKycDocument } from '../utils/uploadUtils';
+import { validateImageFile, fileToBase64 } from '../utils/uploadUtils';
 import { ShieldCheck, Upload, CheckCircle, XCircle, Clock, ArrowLeft, Loader2, FileText } from 'lucide-react';
 import Button from '../components/Button';
 
@@ -58,11 +58,16 @@ const KYC = () => {
 
     setUploading(true);
     try {
-      // Signed upload — never the shared unsigned preset used for profile
-      // photos. Stores publicId/format, not a directly-viewable URL; only
-      // getKycDocumentUrl (admin-only, time-limited) can produce one.
-      const getSignature = () => httpsCallable(functions, 'getKycUploadSignature')();
-      const { publicId, format } = await uploadKycDocument(frontFile, getSignature);
+      // File bytes go straight to our server (base64, over HTTPS), which
+      // uploads to Cloudinary itself with authenticated access — never the
+      // shared unsigned preset used for profile photos, and never a
+      // client-side upload the browser could tamper with. Stores
+      // publicId/format, not a directly-viewable URL; only
+      // getKycDocumentUrl (owner/admin, time-limited) can produce one.
+      const imageBase64 = await fileToBase64(frontFile);
+      const uploadFn = httpsCallable(functions, 'uploadKycDocument');
+      const { data } = await uploadFn({ imageBase64, documentType: docType });
+      const { publicId, format } = data;
       // Document type/number/scan are sensitive PII — kept off the
       // broadly-readable users doc, in the owner/admin-only private/kyc
       // subcollection instead. Only the non-sensitive status stays on the

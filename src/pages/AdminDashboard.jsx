@@ -14,31 +14,39 @@ import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 // Admins can read users/{uid}/private/{contact|kyc} per firestore.rules,
 // but those fields no longer live on the main users doc — fetch them
 // alongside the list so the table/search/KYC review UI still has them.
-// The KYC document itself is `type: authenticated` on Cloudinary (never a
-// directly-viewable URL) — hasKycDoc just flags whether one exists; the
-// actual viewable link is minted on-demand via getKycDocumentUrl.
+// New KYC submissions store documentPublicId (Cloudinary `type:
+// authenticated`, never a directly-viewable URL — getKycDocumentUrl mints
+// a fresh 10-minute link on demand). Submissions from before this change
+// only have the old documentUrl (a public URL) — kept working, but flagged
+// "Legacy" in the UI so pending reviews aren't blocked on a migration.
 const withPrivateDocs = async (users) => Promise.all(users.map(async (u) => {
   const [contactSnap, kycSnap] = await Promise.all([
     getDoc(doc(db, 'users', u.id, 'private', 'contact')),
     getDoc(doc(db, 'users', u.id, 'private', 'kyc')),
   ]);
+  const kycData = kycSnap.exists() ? kycSnap.data() : {};
   return {
     ...u,
     phone: contactSnap.exists() ? contactSnap.data().phone : undefined,
     email: contactSnap.exists() ? contactSnap.data().email : undefined,
-    kycDocumentType: kycSnap.exists() ? kycSnap.data().documentType : undefined,
-    kycDocumentNumber: kycSnap.exists() ? kycSnap.data().documentNumber : undefined,
-    hasKycDoc: kycSnap.exists() && !!kycSnap.data().documentPublicId,
+    kycDocumentType: kycData.documentType,
+    kycDocumentNumber: kycData.documentNumber,
+    kycDocumentPublicId: kycData.documentPublicId,
+    kycDocumentUrl: kycData.documentUrl, // legacy only — absent on new submissions
   };
 }));
 
-// Opens a fresh 5-minute signed URL in a new tab — never stores or reuses
-// a persistent link, since the whole point of ISSUE-001 is that KYC scans
-// aren't viewable without a just-in-time admin-only signature.
-const viewKycDocument = async (userId) => {
-  const getUrl = httpsCallable(functions, 'getKycDocumentUrl');
-  const { data } = await getUrl({ userId });
-  window.open(data.url, '_blank', 'noreferrer');
+// Opens a fresh signed URL (10-minute expiry) in a new tab — never stores
+// or reuses a link, so a re-click after expiry just mints a new one.
+const viewKycDocument = async (ownerUid, publicId) => {
+  try {
+    const getUrl = httpsCallable(functions, 'getKycDocumentUrl');
+    const { data } = await getUrl({ publicId, ownerUid });
+    window.open(data.url, '_blank', 'noreferrer');
+  } catch (err) {
+    console.error('getKycDocumentUrl error:', err);
+    alert('Document open nahi ho saka. Dobara try karein.');
+  }
 };
 
 const PAGE_SIZE = 20;
@@ -452,13 +460,23 @@ const AdminDashboard = () => {
                               <Clock size={12} /> Pending
                             </span>
                           )}
-                          {user.kycStatus === 'submitted' && !user.isVerified && user.hasKycDoc && (
+                          {user.kycStatus === 'submitted' && !user.isVerified && user.kycDocumentPublicId && (
                             <button
-                              onClick={() => viewKycDocument(user.id)}
+                              onClick={() => viewKycDocument(user.id, user.kycDocumentPublicId)}
                               className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                             >
                               📄 View KYC Doc ({user.kycDocumentType})
                             </button>
+                          )}
+                          {user.kycStatus === 'submitted' && !user.isVerified && !user.kycDocumentPublicId && user.kycDocumentUrl && (
+                            <a
+                              href={user.kycDocumentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 hover:underline"
+                            >
+                              ⚠️ Legacy Document — View
+                            </a>
                           )}
                         </div>
                       </td>
@@ -567,14 +585,23 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {user.hasKycDoc && (
+                          {user.kycDocumentPublicId ? (
                             <button
-                              onClick={() => viewKycDocument(user.id)}
+                              onClick={() => viewKycDocument(user.id, user.kycDocumentPublicId)}
                               className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors border-none cursor-pointer"
                             >
                               📄 View Doc
                             </button>
-                          )}
+                          ) : user.kycDocumentUrl ? (
+                            <a
+                              href={user.kycDocumentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors"
+                            >
+                              ⚠️ Legacy Document
+                            </a>
+                          ) : null}
                           <button
                             onClick={() => approveKyc(user)}
                             disabled={updatingId === user.id}

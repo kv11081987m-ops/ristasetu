@@ -1,33 +1,29 @@
 const crypto = require('crypto');
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
-const { defineSecret, defineString } = require('firebase-functions/params');
+const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
-const cloudinary = require('cloudinary').v2;
+const { v2: cloudinary } = require('cloudinary');
 
 initializeApp();
 const db = getFirestore();
 const fcm = getMessaging();
 
-// ── Cloudinary (KYC document signing only — profile photos stay unsigned) ─
-// CLOUDINARY_API_KEY/API_SECRET must be provisioned as Firebase secrets
-// (`firebase functions:secrets:set CLOUDINARY_API_KEY` etc.) and
-// CLOUDINARY_CLOUD_NAME as a regular (non-secret) functions/.env value —
-// none of these exist yet as of this commit, so the two functions below
-// will fail at deploy/runtime until that's done. See project chat log.
-const CLOUDINARY_CLOUD_NAME = defineString('CLOUDINARY_CLOUD_NAME');
-const CLOUDINARY_API_KEY = defineSecret('CLOUDINARY_API_KEY');
-const CLOUDINARY_API_SECRET = defineSecret('CLOUDINARY_API_SECRET');
-const CLOUDINARY_SECRETS = [CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET];
+// ── Cloudinary (KYC documents only — profile photos stay on the separate
+// unsigned client-side preset in src/utils/uploadUtils.js) ────────────────
+const cloudinaryApiSecret = defineSecret('CLOUDINARY_API_SECRET');
+const cloudinaryApiKey = defineSecret('CLOUDINARY_API_KEY');
+const CLOUDINARY_SECRETS = [cloudinaryApiSecret, cloudinaryApiKey];
+const CLOUDINARY_CLOUD_NAME = 'dhzlmcsbu';
 const KYC_UPLOAD_PRESET = 'ristasetu_kyc_secure';
 
 const configureCloudinary = () => cloudinary.config({
-  cloud_name: CLOUDINARY_CLOUD_NAME.value(),
-  api_key: CLOUDINARY_API_KEY.value(),
-  api_secret: CLOUDINARY_API_SECRET.value(),
+  cloud_name: CLOUDINARY_CLOUD_NAME,
+  api_key: cloudinaryApiKey.value(),
+  api_secret: cloudinaryApiSecret.value(),
 });
 
 // ── Password hashing (server-side only) ─────────────────────────────────
@@ -236,72 +232,77 @@ exports.recordBiodataDownload = onCall(async (request) => {
   return { allowed: true, remaining: BIODATA_FREE_LIMIT - (current + 1) };
 });
 
-// ── KYC document upload — server-generated signature only ────────────────
+// ── KYC document upload — file bytes never leave our server ──────────────
 // Government ID scans must never go through the shared unsigned preset
-// used for profile photos. A *signed* Cloudinary upload requires a
-// signature computed with the API secret, which can never be exposed to
-// the browser — this function computes it; the client then performs the
-// actual file upload itself directly to Cloudinary (the file bytes never
-// pass through our server, only these signed params do). `type:
-// 'authenticated'` on the resulting asset means the delivered URL is not
-// publicly viewable without a further signed request (see
-// getKycDocumentUrl below).
-exports.getKycUploadSignature = onCall({ secrets: CLOUDINARY_SECRETS }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Pehle login karein.');
+// used for profile photos. The client sends base64 image data here (over
+// HTTPS, authenticated); this function uploads it to Cloudinary itself
+// using the API key/secret, with `type`/`access_mode: 'authenticated'` so
+// the resulting asset is never publicly viewable by URL alone.
+exports.uploadKycDocument = onCall(
+  { secrets: CLOUDINARY_SECRETS, memory: '512MiB', timeoutSeconds: 120 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+
+    const { imageBase64 } = request.data;
+    if (!imageBase64 || typeof imageBase64 !== 'string' || imageBase64.length > 7_000_000) {
+      throw new HttpsError('invalid-argument', 'Invalid or too large image (max ~5MB)');
+    }
+
+    configureCloudinary();
+
+    const result = await cloudinary.uploader.upload(
+      `data:image/jpeg;base64,${imageBase64}`,
+      {
+        upload_preset: KYC_UPLOAD_PRESET,
+        type: 'authenticated',
+        access_mode: 'authenticated',
+        folder: 'ristasetu/kyc',
+        public_id: `${request.auth.uid}_${Date.now()}`,
+      }
+    );
+
+    // format is needed later — private_download_url() requires the exact
+    // stored format (jpg/png/webp) to resolve to the real asset; hardcoding
+    // 'jpg' would break signed-URL generation for png/webp KYC uploads.
+    return { publicId: result.public_id, version: result.version, format: result.format };
   }
-  configureCloudinary();
+);
 
-  const timestamp = Math.floor(Date.now() / 1000);
-  const paramsToSign = {
-    timestamp,
-    folder: 'ristasetu-kyc',
-    type: 'authenticated',
-    upload_preset: KYC_UPLOAD_PRESET,
-  };
-  const signature = cloudinary.utils.api_sign_request(paramsToSign, CLOUDINARY_API_SECRET.value());
-
-  return {
-    ...paramsToSign,
-    signature,
-    apiKey: CLOUDINARY_API_KEY.value(),
-    cloudName: CLOUDINARY_CLOUD_NAME.value(),
-  };
-});
-
-// ── Admin-only: short-lived signed URL to view a KYC document ────────────
+// ── Signed URL generation — owner or admin only ───────────────────────────
 // Reads the Cloudinary public_id from the owner/admin-only private/kyc
-// subcollection (never trusts a client-supplied URL) and mints a URL that
-// expires in 5 minutes — the raw document is never persistently
-// world-viewable the way the old unsigned-upload URL was.
+// subcollection and cross-checks it against the client-supplied publicId
+// (never trusts the client-supplied value alone) before minting a URL
+// that expires in 10 minutes. Every click gets a fresh one — nothing is
+// cached, so expiry is a non-issue for the viewer.
 exports.getKycDocumentUrl = onCall({ secrets: CLOUDINARY_SECRETS }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Pehle login karein.');
-  }
-  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
-  if (callerSnap.data()?.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'Sirf admin KYC documents dekh sakte hain.');
+  if (!request.auth) throw new HttpsError('unauthenticated', 'Login required');
+
+  const { publicId, ownerUid } = request.data;
+  if (!publicId || !ownerUid) {
+    throw new HttpsError('invalid-argument', 'publicId aur ownerUid zaroori hain.');
   }
 
-  const { userId } = request.data;
-  if (!userId || typeof userId !== 'string') {
-    throw new HttpsError('invalid-argument', 'userId zaroori hai.');
+  const callerDoc = await db.collection('users').doc(request.auth.uid).get();
+  const callerRole = callerDoc.data()?.role;
+  const isAdmin = callerRole === 'admin' || callerRole === 'super_admin';
+  const isOwner = request.auth.uid === ownerUid;
+  if (!isAdmin && !isOwner) {
+    throw new HttpsError('permission-denied', 'Not authorized to view this document');
   }
 
-  const kycSnap = await db.collection('users').doc(userId).collection('private').doc('kyc').get();
-  const { documentPublicId, documentFormat } = kycSnap.data() || {};
-  if (!documentPublicId) {
-    throw new HttpsError('not-found', 'KYC document nahi mila.');
+  const kycDoc = await db.collection('users').doc(ownerUid).collection('private').doc('kyc').get();
+  if (!kycDoc.exists || kycDoc.data().documentPublicId !== publicId) {
+    throw new HttpsError('not-found', 'Document not found');
   }
 
   configureCloudinary();
-  const url = cloudinary.utils.private_download_url(documentPublicId, documentFormat || 'jpg', {
+  const url = cloudinary.utils.private_download_url(publicId, kycDoc.data().documentFormat || 'jpg', {
     resource_type: 'image',
     type: 'authenticated',
-    expires_at: Math.floor(Date.now() / 1000) + 300,
+    expires_at: Math.floor(Date.now() / 1000) + 600,
   });
 
-  return { url };
+  return { url, expiresIn: 600 };
 });
 
 // ── Shaadi confirmed → archive both profiles server-side ──────────────────
