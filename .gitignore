@@ -40,3 +40,4 @@ android-twa/*.idsig
 # Any other android-twa* build folder (e.g. android-twa-OLD) — same secrets,
 # same rule. Whole directory ignored: it's build output, not source.
 android-twa*/
+.firebase/
