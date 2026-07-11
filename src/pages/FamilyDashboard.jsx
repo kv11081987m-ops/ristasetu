@@ -10,6 +10,7 @@ import {
 import { signOut } from 'firebase/auth';
 import { calculateMatchPercentage } from '../utils/matchUtils';
 import BiodataDownloadButton from '../components/BiodataDownloadButton';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 import {
   Users, Heart, LogOut, Eye, MessageCircleOff, PenOff,
   BadgeCheck, Loader2, Star, StarOff,
@@ -172,7 +173,7 @@ const FamilyDashboard = () => {
       {linkedProfile && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6 flex gap-4 items-center">
           <img
-            src={linkedProfile.photoUrl || 'https://placehold.co/80x80/png?text=RS'}
+            src={cloudinaryThumb(linkedProfile.photoUrl, 120) || 'https://placehold.co/80x80/png?text=RS'}
             alt={linkedProfile.name}
             className="w-16 h-16 rounded-full object-cover border-2 border-red-100 shrink-0"
           />
@@ -232,7 +233,7 @@ const FamilyDashboard = () => {
                 >
                   <div className="relative">
                     <img
-                      src={profile.photoUrl || 'https://placehold.co/400x240/png?text=RS'}
+                      src={cloudinaryThumb(profile.photoUrl, 400) || 'https://placehold.co/400x240/png?text=RS'}
                       alt={profile.name}
                       className="w-full h-44 object-cover"
                     />
@@ -293,7 +294,7 @@ const FamilyDashboard = () => {
                   onClick={() => navigate(`/profile/${p.id}`)}
                   className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-full px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors cursor-pointer"
                 >
-                  <img src={p.photoUrl} alt={p.name} className="w-5 h-5 rounded-full object-cover" />
+                  <img src={cloudinaryThumb(p.photoUrl, 40)} alt={p.name} className="w-5 h-5 rounded-full object-cover" />
                   {p.name}
                 </button>
               );

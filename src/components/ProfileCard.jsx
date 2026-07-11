@@ -119,6 +119,7 @@ const ProfileCard = ({ profile, actionButton }) => {
           isFirstVisible={!isPhotoHidden}
           canViewAll={isOwner || isAdmin || isMatch}
           imgClassName="w-full h-64 object-cover"
+          thumbWidth={400}
         />
         {/* Compatibility score ring */}
         <div className="absolute top-2 right-2 pointer-events-none flex flex-col items-center gap-0.5">

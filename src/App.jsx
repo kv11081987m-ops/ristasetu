@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import BottomNav from './components/BottomNav';
 import { useAuthContext } from './context/AuthContext';
@@ -27,6 +27,7 @@ const DisclaimerPage = lazy(() => import('./pages/DisclaimerPage'));
 const SetupPassword  = lazy(() => import('./pages/SetupPassword'));
 const FamilyDashboard = lazy(() => import('./pages/FamilyDashboard'));
 const SuccessStories  = lazy(() => import('./pages/SuccessStories'));
+const NotFound        = lazy(() => import('./pages/NotFound'));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -35,8 +36,7 @@ const PageLoader = () => (
 );
 
 const ProtectedRoute = ({ children }) => {
-  const { currentUser, isProfileComplete, familyMode } = useAuthContext();
-  const location = useLocation();
+  const { currentUser, familyMode } = useAuthContext();
 
   if (!currentUser) return <Navigate to="/splash" replace />;
   // Family accounts should stay in their own dashboard
@@ -116,6 +116,7 @@ const App = () => {
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/disclaimer" element={<DisclaimerPage />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </main>

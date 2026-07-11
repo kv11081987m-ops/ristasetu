@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  RecaptchaVerifier, signInWithPhoneNumber,
-  signInWithEmailAndPassword, signOut,
+  RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { hashPassword } from '../utils/cryptoUtils';
-import { auth, db } from '../firebase/firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
+import { saveOwnContact } from '../utils/contactUtils';
+import { auth, db, functions } from '../firebase/firebaseConfig';
 import { MessageSquare, KeyRound, Eye, EyeOff, Smartphone, BadgeCheck, ArrowLeft } from 'lucide-react';
 
 const OTP_ERRORS = {
@@ -124,38 +124,14 @@ const Login = () => {
       setLoading(true);
       try {
         const rsId = identifier.toUpperCase();
-        const pwHash = await hashPassword(password);
 
-        // Step 1: RS ID lookup in public password_index (no auth needed)
-        const indexSnap = await getDoc(doc(db, 'password_index', rsId));
-        if (!indexSnap.exists()) {
-          setError('Yeh RS ID nahi mili. OTP se login karein aur Settings mein password set karein.');
-          return;
-        }
-        const { uid: expectedUid, hasPassword: hasPw, passwordHash: storedHash } = indexSnap.data();
-        if (!hasPw) {
-          setError('Password set nahi hai. OTP se login karein aur Settings mein password set karein.');
-          return;
-        }
+        // Password is sent raw over HTTPS to the callable function, which
+        // hashes (scrypt + per-user salt) and compares server-side against
+        // password_index — never hashed or compared on the client.
+        const verifyFn = httpsCallable(functions, 'verifyRsLogin');
+        const result = await verifyFn({ rsId, password });
+        const cred = await signInWithCustomToken(auth, result.data.customToken);
 
-        // Step 2: Verify hash locally before making Firebase Auth call
-        if (pwHash !== storedHash) {
-          setError('Galat password. Dobara check karein.');
-          return;
-        }
-
-        // Step 3: Firebase Auth signin with hash as password
-        const virtualEmail = `${rsId.toLowerCase()}@ristasetu.app`;
-        const cred = await signInWithEmailAndPassword(auth, virtualEmail, pwHash);
-
-        // Step 4: Verify UID matches expected (catches broken/duplicate accounts)
-        if (cred.user.uid !== expectedUid) {
-          await signOut(auth);
-          setError('Account mismatch detected. OTP se login karein aur password reset karein.');
-          return;
-        }
-
-        // Step 5: Write session token
         await cred.user.getIdToken(true);
         const sessionToken = Math.random().toString(36).slice(2) + Date.now().toString(36);
         localStorage.setItem('rsSessionToken', sessionToken);
@@ -167,13 +143,16 @@ const Login = () => {
         navigate('/dashboard');
       } catch (err) {
         console.error('[Login]', err.code, err.message);
-        if (err.code === 'auth/user-not-found') {
-          setError('Firebase account nahi mila. OTP se login karein aur password reset karein.');
-        } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-          setError('Login fail hua. OTP se login karein aur password reset karein.');
-        } else if (err.code === 'auth/too-many-requests') {
+        // Cloud Function HttpsError codes
+        if (err.code === 'functions/not-found') {
+          setError('Yeh RS ID nahi mili. OTP se login karein aur Settings mein password set karein.');
+        } else if (err.code === 'functions/failed-precondition') {
+          setError('Password set nahi hai. OTP se login karein aur Settings mein password set karein.');
+        } else if (err.code === 'functions/unauthenticated') {
+          setError('Galat password. Dobara check karein.');
+        } else if (err.code === 'functions/resource-exhausted' || err.code === 'auth/too-many-requests') {
           setError('Bahut zyada attempts. Kuch der baad try karein.');
-        } else if (err.code === 'auth/network-request-failed') {
+        } else if (err.code === 'auth/network-request-failed' || err.code === 'functions/unavailable') {
           setError('Network error — internet check karein.');
         } else {
           setError('Login fail hua. Dobara try karein.');
@@ -204,10 +183,11 @@ const Login = () => {
             const fd = famSnap.data();
             // Create/update their minimal Firestore doc
             if (!snap.exists()) {
-              await setDoc(ref, { phone: user.phoneNumber, isFamilyAccount: true, isProfileComplete: false, createdAt: serverTimestamp(), ...loginMeta });
+              await setDoc(ref, { isFamilyAccount: true, isProfileComplete: false, createdAt: serverTimestamp(), ...loginMeta });
             } else {
               await updateDoc(ref, { ...loginMeta, isFamilyAccount: true });
             }
+            if (user.phoneNumber) await saveOwnContact(user.uid, { phone: user.phoneNumber }).catch(() => {});
             // Notify linked user
             await addDoc(collection(db, 'notifications'), {
               userId: fd.linkedUserId,
@@ -226,11 +206,12 @@ const Login = () => {
       // Regular user flow
       let hasPassword = false;
       if (!snap.exists()) {
-        await setDoc(ref, { phone: user.phoneNumber, createdAt: serverTimestamp(), isProfileComplete: false, ...loginMeta });
+        await setDoc(ref, { createdAt: serverTimestamp(), isProfileComplete: false, ...loginMeta });
       } else {
         hasPassword = snap.data().hasPassword || false;
         await updateDoc(ref, loginMeta);
       }
+      if (user.phoneNumber) await saveOwnContact(user.uid, { phone: user.phoneNumber }).catch(() => {});
       navigate(hasPassword ? '/dashboard' : '/setup-password');
     } catch (err) {
       console.error(err); setError(otpErr(err));

@@ -7,6 +7,7 @@ import { useAppContext } from '../context/AppContext';
 import Button from '../components/Button';
 import { Link } from 'react-router-dom';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
+import { saveOwnContact } from '../utils/contactUtils';
 import { runSmartMatchAlerts } from '../utils/smartMatchUtils';
 import { RASHI_LIST, NAKSHATRA_LIST, MANGLIK_OPTIONS } from '../utils/kundaliUtils';
 
@@ -128,7 +129,6 @@ const CompleteProfile = () => {
         photos: photoUrls,
         isProfileComplete: true,
         uid: currentUser.uid,
-        email: currentUser.email,
         // First-time defaults only — don't clobber on edit
         ...(!userProfile?.kycStatus   && { kycStatus: 'not_started' }),
         ...(!userProfile?.createdAt   && { createdAt: serverTimestamp() }),
@@ -136,6 +136,11 @@ const CompleteProfile = () => {
       };
 
       await setDoc(doc(db, 'users', currentUser.uid), profileData, { merge: true });
+      // email is PII — kept off the broadly-readable users doc, in the
+      // owner/admin-only private/contact subcollection instead.
+      if (currentUser.email) {
+        await saveOwnContact(currentUser.uid, { email: currentUser.email }).catch(() => {});
+      }
 
       // 3. Update global context
       setUserProfile(profileData);

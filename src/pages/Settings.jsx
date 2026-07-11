@@ -10,7 +10,7 @@ import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import ProfileAnalytics from '../components/ProfileAnalytics';
 import StreakDisplay from '../components/StreakDisplay';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
-import { auth, db } from '../firebase/firebaseConfig';
+import { auth, db, functions } from '../firebase/firebaseConfig';
 import {
   signOut, deleteUser,
   EmailAuthProvider, linkWithCredential,
@@ -20,7 +20,13 @@ import {
   doc, deleteDoc, getDocs, updateDoc, setDoc,
   collection, query, where, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+// Legacy-only: verifies credentials created under the old client-side
+// SHA256(password+pepper) scheme so existing users aren't locked out
+// mid-migration. New passwords are never hashed client-side — see T2 fix.
 import { hashPassword } from '../utils/cryptoUtils';
+import { subscribeToContact } from '../utils/contactUtils';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 import { useNavigate, Link } from 'react-router-dom';
 
 // ── Family Access Modal ───────────────────────────────────────────────────────
@@ -239,7 +245,7 @@ const SettingsItem = ({ icon: ItemIcon, title, description, onClick, to, danger 
 
 // ── Password modal (Set / Change) ────────────────────────────────────────
 const PasswordModal = ({ mode, onClose }) => {
-  const { currentUser, userProfile, setUserProfile } = useAuthContext();
+  const { userProfile, setUserProfile } = useAuthContext();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showOld, setShowOld] = useState(false);
@@ -256,43 +262,33 @@ const PasswordModal = ({ mode, onClose }) => {
     try {
       const rsId = userProfile.ristaSetuId.toUpperCase();
       const virtualEmail = `${rsId.toLowerCase()}@ristasetu.app`;
+      const setRsPasswordFn = httpsCallable(functions, 'setRsPassword');
 
       if (mode === 'set') {
-        const pwHash = await hashPassword(newPassword);
-        const credential = EmailAuthProvider.credential(virtualEmail, pwHash);
+        // Raw password → Firebase Auth, which hashes it server-side itself.
+        const credential = EmailAuthProvider.credential(virtualEmail, newPassword);
         await linkWithCredential(auth.currentUser, credential);
         await auth.currentUser.getIdToken(true);
-        await Promise.all([
-          updateDoc(doc(db, 'users', currentUser.uid), { hasPassword: true }),
-          setDoc(doc(db, 'password_index', rsId), {
-            uid: currentUser.uid,
-            hasPassword: true,
-            passwordHash: pwHash,
-          }),
-        ]);
+        // password_index (used by RS-ID login) is hashed+written server-side only.
+        await setRsPasswordFn({ newPassword });
         setUserProfile(prev => ({ ...prev, hasPassword: true }));
       } else {
-        // 'change' mode — try SHA256 first, fallback to plaintext for migration
-        const oldHash = await hashPassword(oldPassword);
-        const newHash = await hashPassword(newPassword);
-
+        // 'change' mode — reauth against whatever scheme is currently linked.
+        // Try raw password (current scheme) first, then fall back through
+        // older schemes so nobody gets locked out mid-migration.
         try {
-          await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldHash));
+          await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldPassword));
         } catch (firstErr) {
           if (firstErr.code === 'auth/wrong-password' || firstErr.code === 'auth/invalid-credential') {
-            // Migration fallback: user may have set password before SHA256 approach
-            await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldPassword));
+            const oldHash = await hashPassword(oldPassword); // legacy SHA256+pepper scheme
+            await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(virtualEmail, oldHash));
           } else {
             throw firstErr;
           }
         }
 
-        await updatePassword(auth.currentUser, newHash);
-        await setDoc(doc(db, 'password_index', rsId), {
-          uid: currentUser.uid,
-          hasPassword: true,
-          passwordHash: newHash,
-        });
+        await updatePassword(auth.currentUser, newPassword);
+        await setRsPasswordFn({ newPassword });
       }
       setSuccess(true);
     } catch (err) {
@@ -628,6 +624,15 @@ const DeleteAccountModal = ({ onConfirm, onCancel, isDeleting, error }) => (
 const Settings = () => {
   const { currentUser, userProfile } = useAuthContext();
   const navigate = useNavigate();
+  const [contact, setContact] = useState(null);
+
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setContact(prev => prev ? null : prev); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    return subscribeToContact(currentUser.uid, setContact);
+  }, [currentUser?.uid]);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -786,7 +791,7 @@ const Settings = () => {
         <div className="relative w-20 h-20 mb-4">
           <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-primary/10 p-1">
             <img
-              src={userProfile?.photoUrl || 'https://placehold.co/80x80/png?text=User'}
+              src={cloudinaryThumb(userProfile?.photoUrl, 160) || 'https://placehold.co/80x80/png?text=User'}
               alt={userProfile?.name}
               className="w-full h-full object-cover rounded-full"
             />
@@ -802,7 +807,7 @@ const Settings = () => {
           )}
         </div>
         <h3 className="font-bold text-xl text-gray-800">{userProfile?.name}</h3>
-        <p className="text-gray-500 text-sm">{userProfile?.phone || userProfile?.email}</p>
+        <p className="text-gray-500 text-sm">{contact?.phone || contact?.email || '...'}</p>
         {userProfile?.ristaSetuId && (
           <div className="mt-2 flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-1.5">
             <span className="text-xs text-gray-400">Aapki RistaSetu ID:</span>
@@ -860,7 +865,7 @@ const Settings = () => {
             </div>
             {userProfile && (
               <BiodataDownloadButton
-                profile={{ ...userProfile, id: currentUser?.uid }}
+                profile={{ ...userProfile, ...(contact || {}), id: currentUser?.uid }}
                 showContact={true}
               />
             )}

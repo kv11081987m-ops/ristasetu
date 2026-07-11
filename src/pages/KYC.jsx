@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { db } from '../firebase/firebaseConfig';
-import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, addDoc, collection, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
 import { ShieldCheck, Upload, CheckCircle, XCircle, Clock, ArrowLeft, Loader2, FileText } from 'lucide-react';
 import Button from '../components/Button';
@@ -26,9 +26,19 @@ const KYC = () => {
   const [frontFile, setFrontFile] = useState(null);
   const [frontPreview, setFrontPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [submittedDoc, setSubmittedDoc] = useState(null);
 
   const alreadySubmitted = userProfile?.kycStatus === 'submitted' || userProfile?.kycStatus === 'verified';
   const isRejected = userProfile?.kycStatus === 'rejected';
+
+  // Document type/number moved to the owner/admin-only private/kyc
+  // subcollection — fetch it for the "already submitted" summary view.
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    return onSnapshot(doc(db, 'users', currentUser.uid, 'private', 'kyc'), (snap) => {
+      setSubmittedDoc(snap.exists() ? snap.data() : null);
+    });
+  }, [currentUser?.uid]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -48,10 +58,16 @@ const KYC = () => {
     setUploading(true);
     try {
       const docUrl = await uploadToCloudinary(frontFile);
+      // Document type/number/scan are sensitive PII — kept off the
+      // broadly-readable users doc, in the owner/admin-only private/kyc
+      // subcollection instead. Only the non-sensitive status stays on the
+      // main doc (needed for badges + the admin pending-review query).
+      await setDoc(doc(db, 'users', currentUser.uid, 'private', 'kyc'), {
+        documentType: docType,
+        documentNumber: docNumber.trim().toUpperCase(),
+        documentUrl: docUrl,
+      }, { merge: true });
       await updateDoc(doc(db, 'users', currentUser.uid), {
-        kycDocumentType: docType,
-        kycDocumentNumber: docNumber.trim().toUpperCase(),
-        kycDocumentUrl: docUrl,
         kycStatus: 'submitted',
         kycSubmittedAt: serverTimestamp(),
         kycRejectionReason: null,
@@ -202,14 +218,14 @@ const KYC = () => {
           </form>
         ) : (
           <div className="p-6">
-            {userProfile?.kycDocumentType && (
+            {submittedDoc?.documentType && (
               <div className="bg-gray-50 rounded-xl p-4 flex items-center gap-3 mb-4">
                 <FileText size={20} className="text-gray-500" />
                 <div>
                   <p className="text-sm font-bold text-gray-700 capitalize">
-                    {DOC_TYPES.find(d => d.value === userProfile.kycDocumentType)?.label || userProfile.kycDocumentType}
+                    {DOC_TYPES.find(d => d.value === submittedDoc.documentType)?.label || submittedDoc.documentType}
                   </p>
-                  <p className="text-xs text-gray-500">{userProfile.kycDocumentNumber}</p>
+                  <p className="text-xs text-gray-500">{submittedDoc.documentNumber}</p>
                 </div>
               </div>
             )}

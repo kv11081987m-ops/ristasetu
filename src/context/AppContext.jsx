@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, query, where, limit } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, query, where, limit } from 'firebase/firestore';
 import { useAuthContext } from './AuthContext';
 
 const AppContext = createContext();
@@ -132,7 +132,10 @@ export const AppProvider = ({ children }) => {
       throw new Error('PENDING_LIMIT');
     }
 
-    await addDoc(collection(db, 'interests'), {
+    // Deterministic ID (senderId_receiverId) — required by the
+    // users/{uid}/private/contact security rule so it can verify a mutual
+    // accepted interest via exists()/get() without needing a query.
+    await setDoc(doc(db, 'interests', `${senderId}_${receiverId}`), {
       senderId,
       receiverId,
       status: 'pending',

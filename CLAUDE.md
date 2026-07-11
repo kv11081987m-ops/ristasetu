@@ -64,14 +64,14 @@ Route guards in `App.jsx`:
 
 | Collection | Purpose |
 |---|---|
-| `users` | One doc per user, keyed by Firebase UID. Fields: `name`, `age`, `gender`, `religion`, `caste`, `community`, `city`, `state`, `occupation`/`profession`, `about`, `photoUrl`, `isVerified`, `kycStatus`, `isProfileComplete`, `role`. |
-| `interests` | Interest requests. Fields: `senderId`, `receiverId`, `status` (`pending`/`accepted`/`declined`), `createdAt`. Accepting one auto-creates a `chats` doc. |
+| `users` | One doc per user, keyed by Firebase UID. Fields: `name`, `age`, `gender`, `religion`, `caste`, `community`, `city`, `state`, `occupation`/`profession`, `about`, `photoUrl`, `isVerified`, `kycStatus`, `isProfileComplete`, `role`. Broadly readable (any authenticated, non-blocked user) to support profile browsing — **never put PII here**. `phone`, `email`, and the KYC document type/number/scan URL live in `users/{uid}/private/{contact|kyc}` instead, readable only by the owner, admins, or (for `contact` only) a user with a mutual `accepted` interest — see `firestore.rules`. `role`, `isVerified`, `isBlocked`, `isPremium`/`premiumPlan`, and non-self-service `kycStatus` values are admin-only writes enforced in rules, not just convention. |
+| `interests` | Interest requests. Doc ID is deterministic (`{senderId}_{receiverId}`) so security rules can verify a mutual accepted interest via `exists()`/`get()` without a query. Fields: `senderId`, `receiverId`, `status` (`pending`/`accepted`/`declined`), `createdAt`. Accepting one auto-creates a `chats` doc. |
 | `shortlists` | Saved profiles. Fields: `userId`, `profileId`, `createdAt`. |
-| `chats` | Chat threads. Fields: `participants` (array of UIDs), `messages` (array of `{id, senderId, text, timestamp}`). |
+| `chats` | Chat threads. Fields: `participants` (array of UIDs), `lastMessage*`. Messages live in the `chats/{id}/messages` subcollection; `Chat.jsx` only subscribes to the most recent 50 live (`MSG_PAGE_SIZE`), loading older history on demand. |
 
 ### Match Scoring
 
-`src/utils/matchUtils.js` `calculateMatchPercentage(user, profile)` scores matches 0–100 with a minimum floor of 60 applied via `Math.max(60, ...)`. Factors: Age proximity (30%), Religion (25%), Location (20%), Community/Caste (15%), Profession (10%). Dashboard sorts profiles by this score descending.
+`src/utils/matchUtils.js` `calculateCompatibility(user, profile)` scores matches 0–100 with **no floor** (0 is a valid score for a genuine non-match). Factors: Dharmic/Religion+Caste+Gotra (30%), Location (20%), Age proximity (20%), Education (15%), Profession (15%). `calculateMatchPercentage(user, profile)` is a backward-compatible wrapper that just returns `.total`. Dashboard sorts profiles by this score descending. This is separate from the 36-Gunn Kundali Milan score (`src/utils/kundaliUtils.js`), which is astrology-based and shown alongside it, not blended into it.
 
 ### Profile Completeness
 

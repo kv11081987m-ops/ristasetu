@@ -12,28 +12,13 @@ export const initiateShaadi = (chatId, initiatorId, receiverId) =>
     initiatedAt: serverTimestamp(),
   });
 
-// Receiver confirms: updates request status + archives own profile only.
-// The initiator sees confirmed status via onSnapshot and calls selfArchive() themselves.
-export const confirmShaadi = async (chatId, myUid, otherUid) => {
-  await updateDoc(doc(db, 'shaadi_requests', chatId), {
+// Receiver confirms: flips request status. Archiving both profiles happens
+// server-side in the onShaadiConfirmed Cloud Function trigger, independent
+// of whether the initiator's client is online to observe this change.
+export const confirmShaadi = (chatId) =>
+  updateDoc(doc(db, 'shaadi_requests', chatId), {
     status: 'confirmed',
     confirmedAt: serverTimestamp(),
-  });
-  await updateDoc(doc(db, 'users', myUid), {
-    maritalStatus: 'married',
-    marriedAt: serverTimestamp(),
-    marriedWith: otherUid,
-    isActive: false,
-  });
-};
-
-// Each user calls this to archive their own profile after confirmation.
-export const selfArchive = (myUid, otherUid) =>
-  updateDoc(doc(db, 'users', myUid), {
-    maritalStatus: 'married',
-    marriedAt: serverTimestamp(),
-    marriedWith: otherUid,
-    isActive: false,
   });
 
 export const declineShaadi = (chatId) =>

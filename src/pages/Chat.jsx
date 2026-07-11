@@ -5,10 +5,11 @@ import { useNotificationContext } from '../context/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { MessageSquare, Home, MoreVertical, ArrowLeft, Smile, Send, X } from 'lucide-react';
 import { db } from '../firebase/firebaseConfig';
-import { collection, onSnapshot, orderBy, query, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, getDoc, getDocs, writeBatch, limit, startAfter } from 'firebase/firestore';
 import { ICEBREAKER_CATEGORIES, getSmartSuggestions } from '../utils/icebreakerQuestions';
-import { initiateShaadi, confirmShaadi, declineShaadi, submitSuccessStory, selfArchive } from '../utils/shaadiUtils';
+import { initiateShaadi, confirmShaadi, declineShaadi, submitSuccessStory } from '../utils/shaadiUtils';
 import { uploadToCloudinary } from '../utils/uploadUtils';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 
 const T = {
   bg: '#2D1B5E',
@@ -55,6 +56,8 @@ const fmtLast = (ts) => {
 const initials = (name) =>
   (name || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 
+const MSG_PAGE_SIZE = 50;
+
 const SingleTick = () => (
   <svg width="14" height="10" viewBox="0 0 14 10" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}>
     <path d="M1 5L5 9L13 1" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -78,7 +81,7 @@ const Avatar = ({ person, size = 48, fs = '1rem' }) => (
     fontWeight: 'bold', color: '#1A0D3D', fontSize: fs, overflow: 'hidden', flexShrink: 0,
   }}>
     {person?.photoUrl
-      ? <img src={person.photoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      ? <img src={cloudinaryThumb(person.photoUrl, size * 2)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           onError={e => { e.target.style.display = 'none'; }} />
       : initials(person?.name)
     }
@@ -214,11 +217,17 @@ const IcebreakerPanel = ({ onSelect, onClose, myProfile, otherUser }) => {
 // ── Inline icebreaker section (shown when 0 messages) ────────────────────────
 const IcebreakerSection = ({ otherUser, myProfile, onSelect, onShowAll }) => {
   const suggestions = getSmartSuggestions(myProfile, otherUser);
-  // Picked once at mount — stable across re-renders
-  const [quickQ] = useState(() => [
-    ICEBREAKER_CATEGORIES[0].questions[Math.floor(Math.random() * 5)],
-    ICEBREAKER_CATEGORIES[3].questions[Math.floor(Math.random() * 5)],
-  ]);
+  // Picked once at mount — stable across re-renders. Indexed off the
+  // category/question array lengths (not hardcoded counts) so editing
+  // ICEBREAKER_CATEGORIES can never produce an undefined button.
+  const [quickQ] = useState(() => {
+    const firstCat = ICEBREAKER_CATEGORIES[0];
+    const lastCat = ICEBREAKER_CATEGORIES[ICEBREAKER_CATEGORIES.length - 1];
+    const pickRandom = (cat) => cat?.questions?.length
+      ? cat.questions[Math.floor(Math.random() * cat.questions.length)]
+      : null;
+    return [pickRandom(firstCat), pickRandom(lastCat)].filter(Boolean);
+  });
 
   return (
     <div style={{
@@ -323,7 +332,12 @@ const Chat = () => {
   const navigate = useNavigate();
 
   const [activeChatId, setActiveChatId] = useState(null);
-  const [messages, setMessages] = useState([]);
+  // Live window = most recent MSG_PAGE_SIZE messages, kept in real time.
+  // Older pages are fetched once (not live) as the user scrolls back.
+  const [liveMessages, setLiveMessages] = useState([]);
+  const [olderMessages, setOlderMessages] = useState([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [text, setText] = useState('');
   const [fetchedProfiles, setFetchedProfiles] = useState({});
   const [readChatIds, setReadChatIds] = useState(new Set());
@@ -384,27 +398,57 @@ const Chat = () => {
     });
   }, [activeChatId]);
 
-  // Auto-archive own profile when shaadi is confirmed (handles the initiator side)
+  // Subscribe to the most recent MSG_PAGE_SIZE messages, live.
   useEffect(() => {
-    if (shaadiRequest?.status !== 'confirmed') return;
-    if (!currentUser?.uid || !otherUser?.id) return;
-    if (userProfile?.maritalStatus === 'married') return; // already done
-    selfArchive(currentUser.uid, otherUser.id).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shaadiRequest?.status, currentUser?.uid, otherUser?.id]);
-
-  // Subscribe to messages
-  useEffect(() => {
+    setOlderMessages(prev => prev.length ? [] : prev); // eslint-disable-line react-hooks/set-state-in-effect
+    setHasMoreMessages(prev => prev ? prev : true);
     if (!activeChatId) {
-      setMessages(prev => prev.length ? [] : prev); // eslint-disable-line react-hooks/set-state-in-effect
+      setLiveMessages(prev => prev.length ? [] : prev);
       return;
     }
     const q = query(
       collection(db, 'chats', activeChatId, 'messages'),
-      orderBy('timestamp', 'asc')
+      orderBy('timestamp', 'desc'),
+      limit(MSG_PAGE_SIZE)
     );
-    return onSnapshot(q, snap => setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    let sawFirstSnapshot = false;
+    return onSnapshot(q, snap => {
+      setLiveMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse());
+      // Only the initial snapshot should decide "is there more history?" —
+      // later re-emissions (new messages arriving) reflect the same window
+      // size regardless of how much older history has already been loaded.
+      if (!sawFirstSnapshot) {
+        sawFirstSnapshot = true;
+        setHasMoreMessages(snap.docs.length >= MSG_PAGE_SIZE);
+      }
+    });
   }, [activeChatId]);
+
+  // Combined view: previously-loaded history + the live recent window.
+  const messages = useMemo(() => [...olderMessages, ...liveMessages], [olderMessages, liveMessages]);
+
+  const handleLoadOlderMessages = async () => {
+    if (!activeChatId || loadingOlder || !hasMoreMessages) return;
+    const oldest = olderMessages[0] || liveMessages[0];
+    if (!oldest?.timestamp) return;
+    setLoadingOlder(true);
+    try {
+      const q = query(
+        collection(db, 'chats', activeChatId, 'messages'),
+        orderBy('timestamp', 'desc'),
+        startAfter(oldest.timestamp),
+        limit(MSG_PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      const page = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+      setOlderMessages(prev => [...page, ...prev]);
+      if (snap.docs.length < MSG_PAGE_SIZE) setHasMoreMessages(false);
+    } catch (e) {
+      console.error('Load older messages error:', e);
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   // Batch-mark received messages as read when chat is open
   useEffect(() => {
@@ -416,10 +460,11 @@ const Chat = () => {
     batch.commit().catch(() => {});
   }, [activeChatId, messages, currentUser]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new live messages only — NOT when older history loads,
+  // which would otherwise yank the view back down while scrolling up.
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [liveMessages]);
 
   // Group messages by date for dividers
   const grouped = useMemo(() => {
@@ -464,7 +509,7 @@ const Chat = () => {
   const handleConfirmShaadi = async () => {
     if (!activeChatId || !otherUser?.id) return;
     try {
-      await confirmShaadi(activeChatId, currentUser.uid, otherUser.id);
+      await confirmShaadi(activeChatId);
       sendNotification(currentUser.uid, 'shaadi_confirmed', 'RistaSetu', null, '💍 Mubarak ho! Aapki shaadi RistaSetu se confirm hui!').catch(() => {});
       sendNotification(otherUser.id, 'shaadi_confirmed', 'RistaSetu', null, '💍 Mubarak ho! Aapki shaadi RistaSetu se confirm hui!').catch(() => {});
       setShowStoryModal(true);
@@ -648,6 +693,21 @@ const Chat = () => {
 
             {/* Messages */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1rem 0.5rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {hasMoreMessages && messages.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '0 0 0.75rem' }}>
+                  <button
+                    onClick={handleLoadOlderMessages}
+                    disabled={loadingOlder}
+                    style={{
+                      background: T.divBg, color: T.gold, border: `1px solid ${T.border}`,
+                      borderRadius: '999px', padding: '0.4rem 1rem', fontSize: '0.75rem', fontWeight: 'bold',
+                      cursor: loadingOlder ? 'default' : 'pointer', opacity: loadingOlder ? 0.6 : 1,
+                    }}
+                  >
+                    {loadingOlder ? 'Load ho raha hai...' : '↑ Purane messages dekhein'}
+                  </button>
+                </div>
+              )}
               {/* Shaadi confirmation banner */}
               {shaadiRequest?.status === 'pending' && shaadiRequest.initiatorId === currentUser?.uid && (
                 <div style={{ margin: '0.75rem 0', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.3)', borderRadius: '0.875rem', padding: '0.875rem 1rem', textAlign: 'center' }}>

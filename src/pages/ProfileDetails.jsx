@@ -10,6 +10,8 @@ import BiodataDownloadButton from '../components/BiodataDownloadButton';
 import { incrementProfileView } from '../utils/analyticsUtils';
 import CompatibilityBreakdown from '../components/CompatibilityBreakdown';
 import KundaliMilan from '../components/KundaliMilan';
+import { subscribeToContact } from '../utils/contactUtils';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 
 const ProfileDetails = () => {
   const { id } = useParams();
@@ -17,6 +19,7 @@ const ProfileDetails = () => {
   const { profiles, loading, interests, sendInterest, toggleShortlist, shortlists } = useAppContext();
   const { currentUser, userProfile: currentUserProfile } = useAuthContext();
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
+  const [contact, setContact] = useState(null);
 
   const profile = profiles.find(p => p.id === id);
 
@@ -26,6 +29,19 @@ const ProfileDetails = () => {
     if (currentUser.uid === profile.id || currentUser.uid === profile.uid) return;
     incrementProfileView(profile.id, currentUser.uid);
   }, [profile?.id, currentUser?.uid, profile?.uid]);
+
+  // Contact (phone/email) is no longer stored on the profile doc — it lives
+  // in users/{id}/private/contact and is server-rule-gated to the owner,
+  // an admin, or a user with a mutual accepted interest. Subscribing here
+  // (rather than trusting a `profile.phone` field) means the reveal is
+  // actually enforced by Firestore, not just hidden in the UI.
+  useEffect(() => {
+    if (!profile?.id) {
+      setContact(prev => prev ? null : prev); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    return subscribeToContact(profile.id, setContact);
+  }, [profile?.id]);
 
   if (loading) {
     return (
@@ -101,7 +117,7 @@ const ProfileDetails = () => {
                     className={`flex-shrink-0 w-14 h-14 rounded overflow-hidden border-2 transition-all ${activePhotoIdx === i ? 'border-red-500 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'}`}
                   >
                     {canViewAll || i === 0 ? (
-                      <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={cloudinaryThumb(url, 150)} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-gray-700 flex items-center justify-center">
                         <Lock size={14} className="text-white/60" />
@@ -186,8 +202,8 @@ const ProfileDetails = () => {
             {existingInterest?.status === 'accepted' && (
               <div className="bg-green-50 p-4 rounded-lg mb-6 border" style={{ borderColor: 'var(--secondary)', backgroundColor: '#F0FDF4' }}>
                 <h3 className="font-bold text-secondary mb-2 flex items-center gap-2"><BadgeCheck size={20} /> Contact Details Revealed</h3>
-                <p><strong>Phone:</strong> {profile.phone}</p>
-                <p><strong>Email:</strong> {profile.email}</p>
+                <p><strong>Phone:</strong> {contact?.phone || 'Loading...'}</p>
+                <p><strong>Email:</strong> {contact?.email || '—'}</p>
               </div>
             )}
 
@@ -208,7 +224,7 @@ const ProfileDetails = () => {
               <div className="flex flex-col items-end gap-2">
                 {(isOwner || isMatch) && (
                   <BiodataDownloadButton
-                    profile={profile}
+                    profile={{ ...profile, ...(contact || {}) }}
                     showContact={isOwner || isMatch}
                   />
                 )}

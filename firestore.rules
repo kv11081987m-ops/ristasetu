@@ -34,21 +34,89 @@ service cloud.firestore {
     }
 
     // ── users ─────────────────────────────────────────────────────────────
+    // NOTE: this document is broadly readable (any non-blocked authenticated
+    // user) because profile browsing is core to the product. Sensitive PII
+    // (phone, email, KYC document numbers/scans) therefore must NEVER live
+    // on this document — see users/{userId}/private/{contact|kyc} below.
     match /users/{userId} {
       allow read: if isAuth() && (isOwner(userId) || isAdmin() || isNotBlocked() || isFamilyOf(userId));
 
       allow create: if isAuth()
         && isOwner(userId)
-        && !('role' in request.resource.data);
+        && !('role' in request.resource.data)
+        && !('phone' in request.resource.data)
+        && !('email' in request.resource.data)
+        && !('kycDocumentType' in request.resource.data)
+        && !('kycDocumentNumber' in request.resource.data)
+        && !('kycDocumentUrl' in request.resource.data)
+        && request.resource.data.get('isVerified', false) == false
+        && request.resource.data.get('isPremium', false) == false
+        && request.resource.data.get('isBlocked', false) == false
+        && request.resource.data.get('kycStatus', 'not_started') in ['not_started', 'submitted']
+        && request.resource.data.get('photos', []).size() <= 5;
 
       allow update: if isAuth() && (
-        (isOwner(userId)
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))
-        ||
         isAdmin()
+        ||
+        (
+          isOwner(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+               ['role', 'isVerified', 'isBlocked', 'phone', 'email',
+                'kycDocumentType', 'kycDocumentNumber', 'kycDocumentUrl']
+             )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPremium'])
+            || request.resource.data.isPremium == false
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['premiumPlan'])
+            || request.resource.data.premiumPlan == 'none'
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['kycStatus'])
+            || request.resource.data.kycStatus in ['not_started', 'submitted']
+          )
+          // Absolute ceiling — the free/premium 2-vs-5 split is a UI-level
+          // convention today (Settings.jsx), not yet server-enforced per
+          // tier; this only stops writes past the hard maximum any tier
+          // is ever allowed to have.
+          && request.resource.data.get('photos', []).size() <= 5
+        )
       );
 
       allow delete: if isAdmin();
+
+      // ── users/{userId}/private/{contact|kyc} ──────────────────────────
+      // phone/email and KYC document data live here instead of on the
+      // broadly-readable parent doc. Only the owner and admins can read
+      // this directly. A matched user's contact card is revealed only
+      // once a mutual 'accepted' interest exists between the two users —
+      // checked here server-side via the deterministic interest doc ID
+      // (senderId_receiverId), never trusted from client-side UI gating.
+      match /private/{docId} {
+        allow read: if isAuth() && (
+          isOwner(userId)
+          || isAdmin()
+          || (
+            docId == 'contact' &&
+            (
+              (
+                exists(/databases/$(database)/documents/interests/$(request.auth.uid + '_' + userId))
+                && get(/databases/$(database)/documents/interests/$(request.auth.uid + '_' + userId)).data.status == 'accepted'
+              )
+              ||
+              (
+                exists(/databases/$(database)/documents/interests/$(userId + '_' + request.auth.uid))
+                && get(/databases/$(database)/documents/interests/$(userId + '_' + request.auth.uid)).data.status == 'accepted'
+              )
+            )
+          )
+        );
+
+        allow create: if isAuth() && isOwner(userId) && docId in ['contact', 'kyc'];
+        allow update: if isAuth() && (isOwner(userId) || isAdmin()) && docId in ['contact', 'kyc'];
+        allow delete: if isAdmin();
+      }
     }
 
     // ── interests ─────────────────────────────────────────────────────────
@@ -62,7 +130,10 @@ service cloud.firestore {
 
       allow create: if isAuth()
         && request.resource.data.senderId == request.auth.uid
-        && request.resource.data.status == 'pending';
+        && request.resource.data.status == 'pending'
+        // Deterministic ID lets the private/contact rule above verify a
+        // mutual accepted interest via exists()/get() without a query.
+        && interestId == request.resource.data.senderId + '_' + request.resource.data.receiverId;
 
       allow update: if isAuth()
         && resource.data.receiverId == request.auth.uid
@@ -147,10 +218,13 @@ service cloud.firestore {
     }
 
     // ── password_index ────────────────────────────────────────────────────
+    // Read locked: lookup is done server-side via verifyRsLogin Cloud Function (admin SDK).
+    // Write locked: hashing (scrypt + per-user salt) happens only inside the
+    // setRsPassword Cloud Function (admin SDK bypasses these rules) — no
+    // client may ever write a password hash directly.
     match /password_index/{rsId} {
-      allow read: if true;
-      allow create: if isAuth() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAuth() && resource.data.uid == request.auth.uid;
+      allow read: if false;
+      allow create, update: if false;
       allow delete: if isAdmin() || (isAuth() && resource.data.uid == request.auth.uid);
     }
 
@@ -223,8 +297,15 @@ service cloud.firestore {
     match /notifications/{notifId} {
       allow read: if isAuth() && resource.data.userId == request.auth.uid;
 
-      allow create: if isAuth()
-        && request.resource.data.fromId == request.auth.uid;
+      allow create: if isAuth() && (
+        // User-to-user notifications (interests, chat, family activity, smart match)
+        request.resource.data.fromId == request.auth.uid
+        // Admin notifications (KYC approved/rejected) — only real admins
+        || (isAdmin() && request.resource.data.fromId == 'admin')
+        // System self-notifications (KYC submitted) — only sender can notify themselves
+        || (request.resource.data.fromId == 'system'
+            && request.resource.data.userId == request.auth.uid)
+      );
 
       allow update: if isAuth()
         && resource.data.userId == request.auth.uid

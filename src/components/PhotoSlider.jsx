@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 
 /**
  * Reusable photo slider.
@@ -10,6 +11,7 @@ import { ChevronLeft, ChevronRight, Lock } from 'lucide-react';
  *   imgClassName  – string    (CSS class applied to the <img>)
  *   currentIndex  – number    (controlled; optional)
  *   onIndexChange – fn(i)     (called when index changes; optional)
+ *   thumbWidth    – number    (Cloudinary delivery width; smaller for grid cards)
  */
 const PhotoSlider = ({
   photos,
@@ -18,6 +20,7 @@ const PhotoSlider = ({
   imgClassName = 'w-full h-64 object-cover',
   currentIndex: controlledIndex,
   onIndexChange,
+  thumbWidth = 600,
 }) => {
   const [internalIdx, setInternalIdx] = useState(0);
   const touchStartX = useRef(null);
@@ -52,7 +55,7 @@ const PhotoSlider = ({
     >
       {/* Photo */}
       <img
-        src={isLocked ? (list[0] || '') : list[idx]}
+        src={cloudinaryThumb(isLocked ? (list[0] || '') : list[idx], thumbWidth)}
         alt={`Photo ${idx + 1}`}
         className={`${imgClassName} transition-all duration-300 ${isLocked ? 'blur-xl scale-110 brightness-50' : ''}`}
         loading="lazy"

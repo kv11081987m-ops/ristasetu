@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { collection, doc, updateDoc, addDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, addDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
+
+// Admins can read users/{uid}/private/{contact|kyc} per firestore.rules,
+// but those fields no longer live on the main users doc — fetch them
+// alongside the list so the table/search/KYC review UI still has them.
+const withPrivateDocs = async (users) => Promise.all(users.map(async (u) => {
+  const [contactSnap, kycSnap] = await Promise.all([
+    getDoc(doc(db, 'users', u.id, 'private', 'contact')),
+    getDoc(doc(db, 'users', u.id, 'private', 'kyc')),
+  ]);
+  return {
+    ...u,
+    phone: contactSnap.exists() ? contactSnap.data().phone : undefined,
+    email: contactSnap.exists() ? contactSnap.data().email : undefined,
+    kycDocumentType: kycSnap.exists() ? kycSnap.data().documentType : undefined,
+    kycDocumentNumber: kycSnap.exists() ? kycSnap.data().documentNumber : undefined,
+    kycDocumentUrl: kycSnap.exists() ? kycSnap.data().documentUrl : undefined,
+  };
+}));
 import {
   ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock,
   Menu, X, LayoutDashboard, Settings, LogOut, Bell, FileText
@@ -8,6 +26,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import { formatDate } from '../utils/formatDate';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 
 const PAGE_SIZE = 20;
 
@@ -33,7 +52,7 @@ const AdminDashboard = () => {
       try {
         const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
         const snap = await getDocs(q);
-        const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const usersList = await withPrivateDocs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         setUsers(usersList);
         setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
         setHasMore(snap.docs.length === PAGE_SIZE);
@@ -74,13 +93,14 @@ const AdminDashboard = () => {
       try {
         const q = query(collection(db, 'users'), where('kycStatus', '==', 'submitted'));
         const snap = await getDocs(q);
-        const list = snap.docs
+        const sorted = snap.docs
           .map(d => ({ id: d.id, ...d.data() }))
           .sort((a, b) => {
             const ta = a.kycSubmittedAt?.toMillis?.() ?? 0;
             const tb = b.kycSubmittedAt?.toMillis?.() ?? 0;
             return ta - tb;
           });
+        const list = await withPrivateDocs(sorted);
         setPendingKyc(list);
       } catch (e) {
         console.error('KYC fetch error:', e);
@@ -158,7 +178,7 @@ const AdminDashboard = () => {
     try {
       const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(PAGE_SIZE), startAfter(lastDoc));
       const snap = await getDocs(q);
-      const newUsers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const newUsers = await withPrivateDocs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setUsers(prev => [...prev, ...newUsers]);
       setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
       setHasMore(snap.docs.length === PAGE_SIZE);
@@ -395,7 +415,7 @@ const AdminDashboard = () => {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-50">
                             {user.photoUrl ? (
-                              <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+                              <img src={cloudinaryThumb(user.photoUrl, 80)} alt="" className="w-full h-full object-cover" />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs font-bold uppercase">
                                 {(user.name || 'U').charAt(0)}
@@ -517,7 +537,7 @@ const AdminDashboard = () => {
                       <div className="flex items-center gap-4 flex-wrap">
                         <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0">
                           {user.photoUrl
-                            ? <img src={user.photoUrl} alt="" className="w-full h-full object-cover" />
+                            ? <img src={cloudinaryThumb(user.photoUrl, 100)} alt="" className="w-full h-full object-cover" />
                             : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-sm">{(user.name || 'U').charAt(0)}</div>
                           }
                         </div>
@@ -597,7 +617,7 @@ const AdminDashboard = () => {
                     <div key={story.id} className="border border-gray-100 rounded-xl p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-start gap-3">
                         {story.photoUrl ? (
-                          <img src={story.photoUrl} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
+                          <img src={cloudinaryThumb(story.photoUrl, 120)} alt="" className="w-14 h-14 rounded-full object-cover flex-shrink-0" />
                         ) : (
                           <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0 text-2xl">💑</div>
                         )}
