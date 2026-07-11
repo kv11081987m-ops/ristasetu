@@ -1,14 +1,34 @@
 const crypto = require('crypto');
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret, defineString } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { getMessaging } = require('firebase-admin/messaging');
 const { getAuth } = require('firebase-admin/auth');
+const cloudinary = require('cloudinary').v2;
 
 initializeApp();
 const db = getFirestore();
 const fcm = getMessaging();
+
+// ── Cloudinary (KYC document signing only — profile photos stay unsigned) ─
+// CLOUDINARY_API_KEY/API_SECRET must be provisioned as Firebase secrets
+// (`firebase functions:secrets:set CLOUDINARY_API_KEY` etc.) and
+// CLOUDINARY_CLOUD_NAME as a regular (non-secret) functions/.env value —
+// none of these exist yet as of this commit, so the two functions below
+// will fail at deploy/runtime until that's done. See project chat log.
+const CLOUDINARY_CLOUD_NAME = defineString('CLOUDINARY_CLOUD_NAME');
+const CLOUDINARY_API_KEY = defineSecret('CLOUDINARY_API_KEY');
+const CLOUDINARY_API_SECRET = defineSecret('CLOUDINARY_API_SECRET');
+const CLOUDINARY_SECRETS = [CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET];
+const KYC_UPLOAD_PRESET = 'ristasetu_kyc_secure';
+
+const configureCloudinary = () => cloudinary.config({
+  cloud_name: CLOUDINARY_CLOUD_NAME.value(),
+  api_key: CLOUDINARY_API_KEY.value(),
+  api_secret: CLOUDINARY_API_SECRET.value(),
+});
 
 // ── Password hashing (server-side only) ─────────────────────────────────
 // Passwords are hashed here with scrypt (memory-hard, per-user random salt)
@@ -214,6 +234,74 @@ exports.recordBiodataDownload = onCall(async (request) => {
 
   await ref.set({ month, count: current + 1 });
   return { allowed: true, remaining: BIODATA_FREE_LIMIT - (current + 1) };
+});
+
+// ── KYC document upload — server-generated signature only ────────────────
+// Government ID scans must never go through the shared unsigned preset
+// used for profile photos. A *signed* Cloudinary upload requires a
+// signature computed with the API secret, which can never be exposed to
+// the browser — this function computes it; the client then performs the
+// actual file upload itself directly to Cloudinary (the file bytes never
+// pass through our server, only these signed params do). `type:
+// 'authenticated'` on the resulting asset means the delivered URL is not
+// publicly viewable without a further signed request (see
+// getKycDocumentUrl below).
+exports.getKycUploadSignature = onCall({ secrets: CLOUDINARY_SECRETS }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Pehle login karein.');
+  }
+  configureCloudinary();
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const paramsToSign = {
+    timestamp,
+    folder: 'ristasetu-kyc',
+    type: 'authenticated',
+    upload_preset: KYC_UPLOAD_PRESET,
+  };
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, CLOUDINARY_API_SECRET.value());
+
+  return {
+    ...paramsToSign,
+    signature,
+    apiKey: CLOUDINARY_API_KEY.value(),
+    cloudName: CLOUDINARY_CLOUD_NAME.value(),
+  };
+});
+
+// ── Admin-only: short-lived signed URL to view a KYC document ────────────
+// Reads the Cloudinary public_id from the owner/admin-only private/kyc
+// subcollection (never trusts a client-supplied URL) and mints a URL that
+// expires in 5 minutes — the raw document is never persistently
+// world-viewable the way the old unsigned-upload URL was.
+exports.getKycDocumentUrl = onCall({ secrets: CLOUDINARY_SECRETS }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Pehle login karein.');
+  }
+  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+  if (callerSnap.data()?.role !== 'admin') {
+    throw new HttpsError('permission-denied', 'Sirf admin KYC documents dekh sakte hain.');
+  }
+
+  const { userId } = request.data;
+  if (!userId || typeof userId !== 'string') {
+    throw new HttpsError('invalid-argument', 'userId zaroori hai.');
+  }
+
+  const kycSnap = await db.collection('users').doc(userId).collection('private').doc('kyc').get();
+  const { documentPublicId, documentFormat } = kycSnap.data() || {};
+  if (!documentPublicId) {
+    throw new HttpsError('not-found', 'KYC document nahi mila.');
+  }
+
+  configureCloudinary();
+  const url = cloudinary.utils.private_download_url(documentPublicId, documentFormat || 'jpg', {
+    resource_type: 'image',
+    type: 'authenticated',
+    expires_at: Math.floor(Date.now() / 1000) + 300,
+  });
+
+  return { url };
 });
 
 // ── Shaadi confirmed → archive both profiles server-side ──────────────────

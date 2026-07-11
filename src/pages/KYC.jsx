@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
-import { db } from '../firebase/firebaseConfig';
+import { db, functions } from '../firebase/firebaseConfig';
 import { doc, setDoc, updateDoc, addDoc, collection, serverTimestamp, onSnapshot } from 'firebase/firestore';
-import { validateImageFile, uploadToCloudinary } from '../utils/uploadUtils';
+import { httpsCallable } from 'firebase/functions';
+import { validateImageFile, uploadKycDocument } from '../utils/uploadUtils';
 import { ShieldCheck, Upload, CheckCircle, XCircle, Clock, ArrowLeft, Loader2, FileText } from 'lucide-react';
 import Button from '../components/Button';
 
@@ -57,7 +58,11 @@ const KYC = () => {
 
     setUploading(true);
     try {
-      const docUrl = await uploadToCloudinary(frontFile);
+      // Signed upload — never the shared unsigned preset used for profile
+      // photos. Stores publicId/format, not a directly-viewable URL; only
+      // getKycDocumentUrl (admin-only, time-limited) can produce one.
+      const getSignature = () => httpsCallable(functions, 'getKycUploadSignature')();
+      const { publicId, format } = await uploadKycDocument(frontFile, getSignature);
       // Document type/number/scan are sensitive PII — kept off the
       // broadly-readable users doc, in the owner/admin-only private/kyc
       // subcollection instead. Only the non-sensitive status stays on the
@@ -65,7 +70,8 @@ const KYC = () => {
       await setDoc(doc(db, 'users', currentUser.uid, 'private', 'kyc'), {
         documentType: docType,
         documentNumber: docNumber.trim().toUpperCase(),
-        documentUrl: docUrl,
+        documentPublicId: publicId,
+        documentFormat: format,
       }, { merge: true });
       await updateDoc(doc(db, 'users', currentUser.uid), {
         kycStatus: 'submitted',

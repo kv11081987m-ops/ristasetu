@@ -240,9 +240,29 @@ service cloud.firestore {
     // ── smart_match_daily ─────────────────────────────────────────────────
     // Per-user daily notification counter — prevents spam.
     // Doc ID: {userId}_{YYYY-MM-DD}
+    // NOTE: this is legitimately written by someone OTHER than `userId` —
+    // a newly-registering user increments each existing candidate's
+    // counter when they're notified about the new match, so a plain
+    // `request.auth.uid == resource.data.userId` ownership check would
+    // break the feature entirely. Instead: the doc ID must match the
+    // claimed userId+date (can't target a doc under mismatched data), and
+    // count can only ever start at 1 or move up by exactly 1 per write —
+    // never jumped to an arbitrary number to instantly exhaust someone
+    // else's daily cap.
     match /smart_match_daily/{docId} {
       allow read: if isAuth();
-      allow write: if isAuth();
+
+      allow create: if isAuth()
+        && request.resource.data.userId is string
+        && request.resource.data.date is string
+        && docId == request.resource.data.userId + '_' + request.resource.data.date
+        && request.resource.data.count == 1;
+
+      allow update: if isAuth()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count'])
+        && request.resource.data.count == resource.data.count + 1;
+
+      allow delete: if isAdmin();
     }
 
     // ── shaadi_requests ───────────────────────────────────────────────────
@@ -279,12 +299,19 @@ service cloud.firestore {
 
     // ── analytics ─────────────────────────────────────────────────────────
     // Only the profile owner can read their own analytics.
-    // Any authenticated user can create/update — but non-owners may only
-    // touch the view-count fields.
+    // NOTE: this doc is legitimately first-created by a VIEWER, not the
+    // owner (incrementProfileView() fires from whoever looks at a profile,
+    // targeting analytics/{profileOwnerId}) — so create can't be
+    // owner-only either, or the very first view of any profile would fail.
+    // Instead: non-owners may only ever write the three view-count fields,
+    // never arbitrary data, on both create and update.
     match /analytics/{userId} {
       allow read: if isAuth() && isOwner(userId);
 
-      allow create: if isAuth();
+      allow create: if isAuth() && (
+        isOwner(userId)
+        || request.resource.data.keys().hasOnly(['profileViews', 'weeklyViews', 'lastUpdated'])
+      );
 
       allow update: if isAuth() && (
         isOwner(userId)

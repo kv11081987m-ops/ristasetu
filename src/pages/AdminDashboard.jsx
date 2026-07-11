@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { collection, doc, getDoc, updateDoc, addDoc, getDocs, query, orderBy, limit, startAfter, where, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase/firebaseConfig';
+import {
+  ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock,
+  Menu, X, LayoutDashboard, Settings, LogOut, Bell, FileText
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import Button from '../components/Button';
+import { formatDate } from '../utils/formatDate';
+import { cloudinaryThumb } from '../utils/cloudinaryUrl';
 
 // Admins can read users/{uid}/private/{contact|kyc} per firestore.rules,
 // but those fields no longer live on the main users doc — fetch them
 // alongside the list so the table/search/KYC review UI still has them.
+// The KYC document itself is `type: authenticated` on Cloudinary (never a
+// directly-viewable URL) — hasKycDoc just flags whether one exists; the
+// actual viewable link is minted on-demand via getKycDocumentUrl.
 const withPrivateDocs = async (users) => Promise.all(users.map(async (u) => {
   const [contactSnap, kycSnap] = await Promise.all([
     getDoc(doc(db, 'users', u.id, 'private', 'contact')),
@@ -16,17 +28,18 @@ const withPrivateDocs = async (users) => Promise.all(users.map(async (u) => {
     email: contactSnap.exists() ? contactSnap.data().email : undefined,
     kycDocumentType: kycSnap.exists() ? kycSnap.data().documentType : undefined,
     kycDocumentNumber: kycSnap.exists() ? kycSnap.data().documentNumber : undefined,
-    kycDocumentUrl: kycSnap.exists() ? kycSnap.data().documentUrl : undefined,
+    hasKycDoc: kycSnap.exists() && !!kycSnap.data().documentPublicId,
   };
 }));
-import {
-  ShieldCheck, CheckCircle, XCircle, Loader2, Users, UserCheck, Clock,
-  Menu, X, LayoutDashboard, Settings, LogOut, Bell, FileText
-} from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import Button from '../components/Button';
-import { formatDate } from '../utils/formatDate';
-import { cloudinaryThumb } from '../utils/cloudinaryUrl';
+
+// Opens a fresh 5-minute signed URL in a new tab — never stores or reuses
+// a persistent link, since the whole point of ISSUE-001 is that KYC scans
+// aren't viewable without a just-in-time admin-only signature.
+const viewKycDocument = async (userId) => {
+  const getUrl = httpsCallable(functions, 'getKycDocumentUrl');
+  const { data } = await getUrl({ userId });
+  window.open(data.url, '_blank', 'noreferrer');
+};
 
 const PAGE_SIZE = 20;
 
@@ -439,15 +452,13 @@ const AdminDashboard = () => {
                               <Clock size={12} /> Pending
                             </span>
                           )}
-                          {user.kycStatus === 'submitted' && !user.isVerified && (
-                            <a
-                              href={user.kycDocumentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline"
+                          {user.kycStatus === 'submitted' && !user.isVerified && user.hasKycDoc && (
+                            <button
+                              onClick={() => viewKycDocument(user.id)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:underline bg-transparent border-none cursor-pointer p-0"
                             >
                               📄 View KYC Doc ({user.kycDocumentType})
-                            </a>
+                            </button>
                           )}
                         </div>
                       </td>
@@ -556,15 +567,13 @@ const AdminDashboard = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          {user.kycDocumentUrl && (
-                            <a
-                              href={user.kycDocumentUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                          {user.hasKycDoc && (
+                            <button
+                              onClick={() => viewKycDocument(user.id)}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors border-none cursor-pointer"
                             >
                               📄 View Doc
-                            </a>
+                            </button>
                           )}
                           <button
                             onClick={() => approveKyc(user)}
