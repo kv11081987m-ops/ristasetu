@@ -1,7 +1,7 @@
 {
   "name": "RistaSetu - Trusted Matrimony",
   "short_name": "RistaSetu",
-  "description": "Gorakhpur aur Deoria ke liye trusted matrimony platform. Apna jeevan saathi dhundhein.",
+  "description": "पूर्वांचल का सबसे भरोसेमंद वैवाहिक प्लेटफ़ॉर्म। अपना जीवनसाथी खोजें।",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -66,7 +66,29 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/screenshots/screen-dashboard.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "RistaSetu Dashboard - Matches dekho"
+    },
+    {
+      "src": "/screenshots/screen-profile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Profile aur Kundali Milan"
+    },
+    {
+      "src": "/screenshots/screen-chat.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Chat aur Shaadi Confirmation"
+    }
+  ],
   "related_applications": [],
   "prefer_related_applications": false
 }

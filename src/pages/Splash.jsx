@@ -16,7 +16,7 @@ const Splash = () => {
     <div className="container flex flex-col items-center justify-center text-center page-transition" style={{ minHeight: '80vh' }}>
       <ShieldCheck color="var(--primary)" size={80} className="mb-4" />
       <h1 className="text-primary font-bold mb-2" style={{ fontSize: '3rem', fontFamily: 'Georgia, serif' }}>RistaSetu</h1>
-      <p className="text-light text-xl mb-8 max-w-md">Gorakhpur aur Deoria ka sabse bharosemand matrimony platform.</p>
+      <p className="text-light text-xl mb-8 max-w-md">पूर्वांचल का सबसे भरोसेमंद वैवाहिक (मैट्रिमोनियल) प्लेटफ़ॉर्म।</p>
 
       {/* Age consent checkbox */}
       <label className="flex items-center gap-3 mb-6 cursor-pointer max-w-sm">
@@ -27,7 +27,7 @@ const Splash = () => {
           className="w-5 h-5 accent-red-600 cursor-pointer flex-shrink-0"
         />
         <span className="text-sm text-gray-600 text-left">
-          Main confirm karta/karti hoon ki meri age <strong>18 saal ya usse zyada</strong> hai aur main India ke kanoon ke anusaar vivah ke yogya hoon.
+          मैं पुष्टि करता/करती हूँ कि मेरी आयु <strong>18 वर्ष या उससे अधिक</strong> है और मैं भारत के कानून के अनुसार विवाह के लिए पात्र हूँ।
         </span>
       </label>
 
@@ -41,11 +41,11 @@ const Splash = () => {
       </div>
 
       <p className="text-xs text-gray-400 mt-8 max-w-xs">
-        Aage badhne par aap hamare{' '}
-        <Link to="/terms" className="underline hover:text-gray-600">Terms of Service</Link>
-        {' '}aur{' '}
-        <Link to="/privacy" className="underline hover:text-gray-600">Privacy Policy</Link>
-        {' '}se sahmat hote hain.
+        आगे बढ़ने पर आप हमारी{' '}
+        <Link to="/terms" className="underline hover:text-gray-600">सेवा शर्तें</Link>
+        {' '}और{' '}
+        <Link to="/privacy" className="underline hover:text-gray-600">गोपनीयता नीति</Link>
+        {' '}से सहमत होते हैं।
       </p>
     </div>
   );
