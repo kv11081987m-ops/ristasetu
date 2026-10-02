@@ -1,0 +1,1 @@
+var e=(e,t=500)=>!e||typeof e!=`string`||!e.includes(`/upload/`)?e:e.replace(`/upload/`,`/upload/f_auto,q_auto,w_${t},c_fill/`);export{e as t};

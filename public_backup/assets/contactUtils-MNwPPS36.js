@@ -1,0 +1,1 @@
+import{C as e,g as t,n,p as r}from"./firebaseConfig-CTdKW95F.js";var i=(t,i)=>t?r(e(n,`users`,t,`private`,`contact`),e=>i(e.exists()?e.data():null),()=>i(null)):(i(null),()=>{}),a=(r,i)=>t(e(n,`users`,r,`private`,`contact`),i,{merge:!0});export{i as n,a as t};

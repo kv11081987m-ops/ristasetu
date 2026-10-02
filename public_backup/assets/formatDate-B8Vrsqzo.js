@@ -1,0 +1,1 @@
+var e=e=>{if(!e)return`N/A`;try{let t=new Date(e);return isNaN(t.getTime())?`Invalid Date`:new Intl.DateTimeFormat(`en-GB`,{day:`2-digit`,month:`short`,year:`numeric`}).format(t)}catch(e){return console.error(`Error formatting date:`,e),`Error`}};export{e as t};

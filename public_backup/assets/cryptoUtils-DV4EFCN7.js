@@ -1,0 +1,1 @@
+var e=`ristasetu-2026`;async function t(e){let t=new TextEncoder().encode(e),n=await crypto.subtle.digest(`SHA-256`,t);return Array.from(new Uint8Array(n)).map(e=>e.toString(16).padStart(2,`0`)).join(``)}var n=n=>t(n+e);export{n as t};

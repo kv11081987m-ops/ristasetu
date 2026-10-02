@@ -1,0 +1,1 @@
+import"./chunk-CaILmz35.js";import{a as e,d as t,t as n}from"./jsx-runtime-BmZpDUES.js";t();var r=n(),i=()=>(0,r.jsx)(e,{to:`/splash`,replace:!0});export{i as default};
