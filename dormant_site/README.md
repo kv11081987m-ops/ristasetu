@@ -1,0 +1,1 @@
+Deployed Coming Soon page. To redeploy: copy these files into dist/, then run `firebase deploy --only hosting`. To relaunch the real app: restore firestore.rules from firestore.rules.bak, run `npm run build`, then deploy.

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="hi-IN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>RistaSetu — Coming Soon</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:linear-gradient(135deg,#fff1f2,#fff7ed);color:#7f1d1d}
+h1{font-size:clamp(2rem,9vw,3.5rem);margin-bottom:12px}
+h2{font-size:clamp(1.4rem,6vw,2.2rem);font-weight:600;margin-bottom:8px}
+p{color:#9a3412;font-size:1.05rem}
+</style>
+</head>
+<body>
+<main>
+<h1>RistaSetu</h1>
+<h2>जल्द आ रहा है</h2>
+<h2>Coming Soon</h2>
+<p>We'll be back shortly.</p>
+</main>
+<script>
+if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})}).catch(function(){})}
+if(window.caches){caches.keys().then(function(k){k.forEach(function(n){caches.delete(n)})}).catch(function(){})}
+</script>
+</body>
+</html>
